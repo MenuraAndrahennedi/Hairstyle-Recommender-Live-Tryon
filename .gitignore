@@ -51,9 +51,7 @@ desktop.ini
 
 # Model checkpoints, generated datasets, cached outputs
 checkpoints/
-data/processed/
-data/indexes/
-data/raw/
+data/
 outputs/
 models/
 backend/models/
