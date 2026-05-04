@@ -1,0 +1,1 @@
+"""Placeholder asset repository module."""
