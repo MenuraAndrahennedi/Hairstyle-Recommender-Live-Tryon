@@ -120,6 +120,75 @@ h1 {
   gap: 1rem;
 }
 
+.system-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.system-card {
+  display: grid;
+  gap: 0.75rem;
+  align-content: start;
+  min-height: 220px;
+  padding: 1.2rem;
+  border: 1px solid var(--line);
+  border-radius: 1.8rem;
+  color: var(--ink);
+  text-align: left;
+  background: rgba(255, 250, 240, 0.68);
+  box-shadow: 0 24px 70px rgba(56, 38, 17, 0.1);
+}
+
+.system-card.active {
+  border-color: rgba(184, 82, 50, 0.72);
+  background: rgba(255, 248, 240, 0.92);
+  transform: translateY(-2px);
+}
+
+.system-card strong {
+  color: var(--accent-dark);
+  font-size: 1.05rem;
+}
+
+.system-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.system-eyebrow,
+.system-badge {
+  font-weight: 800;
+}
+
+.system-eyebrow {
+  color: var(--sage);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.system-badge {
+  color: var(--accent-dark);
+}
+
+.subsystem-header {
+  display: grid;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+}
+
+.subsystem-header h2,
+.subsystem-placeholder h2 {
+  font-size: clamp(1.6rem, 3vw, 2.4rem);
+}
+
+.subtle-pill {
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.44);
+}
+
 .panel,
 .card {
   border: 1px solid var(--line);
@@ -261,6 +330,10 @@ h1 {
 
 .result {
   margin-top: 1.5rem;
+}
+
+.subsystem-placeholder {
+  margin-top: 1rem;
 }
 
 .error {

@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-_STATIC_APP_ROOT = (
-    Path(__file__).resolve().parents[1] / "systems" / "static_2d" / "app"
+
+APP_ROOT = Path(__file__).resolve().parent
+AUTO_APP_ROOT = (
+    APP_ROOT.parent / "systems" / "static_auto_tryon" / "auto_app"
 )
 
-__path__ = [str(_STATIC_APP_ROOT)]
+__path__ = [str(APP_ROOT), str(AUTO_APP_ROOT)]

@@ -1,0 +1,16 @@
+fastapi
+uvicorn
+mediapipe
+pillow
+opencv-python
+numpy
+pandas
+matplotlib
+scikit-learn
+torch
+torchvision
+diffusers
+transformers
+accelerate
+safetensors
+sentencepiece

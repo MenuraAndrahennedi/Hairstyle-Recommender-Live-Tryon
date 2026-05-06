@@ -1,4 +1,11 @@
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000";
+export const SYSTEM_BASE_PATHS = {
+  staticManual: "/api/static-manual",
+  staticAuto: "/api/static-auto",
+  generative: "/api/generative",
+  live2d: "/api/live-2d",
+  live3d: "/api/live-3d"
+};
 
 function mediaUrl(path) {
   if (!path) return "";
@@ -10,10 +17,14 @@ export function resolveMediaUrl(path) {
   return mediaUrl(path);
 }
 
-export async function analyzeFace(image) {
+function subsystemUrl(basePath, route) {
+  return `${API_BASE_URL}${basePath}${route}`;
+}
+
+export async function analyzeFace(image, basePath = SYSTEM_BASE_PATHS.staticAuto) {
   const formData = new FormData();
   formData.append("image", image);
-  const response = await fetch(`${API_BASE_URL}/api/analyze-face`, {
+  const response = await fetch(subsystemUrl(basePath, "/api/analyze-face"), {
     method: "POST",
     body: formData
   });
@@ -21,8 +32,13 @@ export async function analyzeFace(image) {
   return response.json();
 }
 
-export async function recommendHairstyles(faceAttributes, targetGender, topK = 6) {
-  const response = await fetch(`${API_BASE_URL}/api/recommend`, {
+export async function recommendHairstyles(
+  faceAttributes,
+  targetGender,
+  topK = 6,
+  basePath = SYSTEM_BASE_PATHS.staticAuto
+) {
+  const response = await fetch(subsystemUrl(basePath, "/api/recommend"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -39,11 +55,11 @@ export async function recommendHairstyles(faceAttributes, targetGender, topK = 6
   return payload.recommendations;
 }
 
-export async function generateTryOn(image, assetId) {
+export async function generateTryOn(image, assetId, basePath = SYSTEM_BASE_PATHS.staticAuto) {
   const formData = new FormData();
   formData.append("image", image);
   formData.append("asset_id", assetId);
-  const response = await fetch(`${API_BASE_URL}/api/tryon`, {
+  const response = await fetch(subsystemUrl(basePath, "/api/tryon"), {
     method: "POST",
     body: formData
   });
@@ -51,14 +67,14 @@ export async function generateTryOn(image, assetId) {
   return response.json();
 }
 
-export async function fetchAssetBankSummary() {
-  const response = await fetch(`${API_BASE_URL}/api/assets/summary`);
+export async function fetchAssetBankSummary(basePath = SYSTEM_BASE_PATHS.staticAuto) {
+  const response = await fetch(subsystemUrl(basePath, "/api/assets/summary"));
   if (!response.ok) throw new Error(await response.text());
   return response.json();
 }
 
-export async function fetchLiveTopTierAssets() {
-  const response = await fetch(`${API_BASE_URL}/api/assets/live-top-tier`);
+export async function fetchLiveTopTierAssets(basePath = SYSTEM_BASE_PATHS.staticAuto) {
+  const response = await fetch(subsystemUrl(basePath, "/api/assets/live-top-tier"));
   if (!response.ok) throw new Error(await response.text());
   const payload = await response.json();
   return payload.assets;
