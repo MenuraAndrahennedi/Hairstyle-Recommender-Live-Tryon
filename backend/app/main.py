@@ -8,15 +8,14 @@ from systems.generative_tryon.generative_app.main import app as generative_tryon
 from systems.live_2d.app.main import app as live_2d_app
 from systems.live_3d.app.main import app as live_3d_app
 from systems.static_auto_tryon.auto_app.main import app as static_auto_tryon_app
-from systems.static_manual_tryon.manual_app.main import app as static_manual_tryon_app
 
 
 app = FastAPI(
     title="Hairstyle Recommender Multi-System Backend",
     version="0.1.0",
     description=(
-        "Gateway backend that separates the project into static manual try-on, "
-        "static auto try-on, generative try-on, live 2D try-on, and live 3D try-on subsystems."
+        "Gateway backend that separates the project into static auto try-on, "
+        "generative try-on, live 2D try-on, and live 3D try-on subsystems."
     ),
 )
 
@@ -38,12 +37,6 @@ def health() -> dict[str, str]:
 def systems_catalog() -> dict[str, list[dict[str, str]]]:
     return {
         "systems": [
-            {
-                "id": "static-manual",
-                "name": "Static Manual Try-On",
-                "mount_path": "/api/static-manual",
-                "status": "active",
-            },
             {
                 "id": "static-auto",
                 "name": "Static Auto Try-On",
@@ -72,7 +65,6 @@ def systems_catalog() -> dict[str, list[dict[str, str]]]:
     }
 
 
-app.mount("/api/static-manual", static_manual_tryon_app)
 app.mount("/api/static-auto", static_auto_tryon_app)
 app.mount("/api/generative", generative_tryon_app)
 app.mount("/api/live-2d", live_2d_app)

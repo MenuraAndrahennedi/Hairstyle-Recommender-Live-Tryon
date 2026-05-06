@@ -10,18 +10,10 @@ import {
 
 const SYSTEMS = [
   {
-    id: "staticManual",
-    label: "Static Manual Try-On",
-    badge: "Active",
-    eyebrow: "Subsystem 1",
-    summary:
-      "Upload, segment, recommend, and prepare hair assets for manual drag-and-place positioning on the head."
-  },
-  {
     id: "staticAuto",
     label: "Static Auto Try-On",
     badge: "Active",
-    eyebrow: "Subsystem 2",
+    eyebrow: "Subsystem 1",
     summary:
       "Upload, segment, recommend, and automatically generate static 2D try-on results with the current renderer."
   },
@@ -29,22 +21,23 @@ const SYSTEMS = [
     id: "generative",
     label: "Generative Try-On",
     badge: "Experimental",
-    eyebrow: "Subsystem 3",
+    eyebrow: "Subsystem 2",
     summary:
       "Uses the separate generative package-building workflow and final inpainting experiments without changing the underlying logic."
   },
   {
     id: "live2d",
     label: "Live 2D Try-On",
-    badge: "Empty",
-    eyebrow: "Subsystem 4",
-    summary: "Reserved backend slot for future live 2D try-on work."
+    badge: "Demo Ready",
+    eyebrow: "Subsystem 3",
+    summary:
+      "Dedicated webcam system using the project's own recommendation flow, segmentation model, and static try-on hair assets."
   },
   {
     id: "live3d",
     label: "Live 3D Try-On",
     badge: "Empty",
-    eyebrow: "Subsystem 5",
+    eyebrow: "Subsystem 4",
     summary: "Reserved backend slot for future live 3D try-on work."
   }
 ];
@@ -74,13 +67,12 @@ export default function App() {
   const [assetBankSummary, setAssetBankSummary] = useState(null);
 
   const selectedSystem = useMemo(
-    () => SYSTEMS.find((item) => item.id === activeSystem) ?? SYSTEMS[1],
+    () => SYSTEMS.find((item) => item.id === activeSystem) ?? SYSTEMS[0],
     [activeSystem]
   );
   const subsystemBasePath =
     SYSTEM_BASE_PATHS[activeSystem] ?? SYSTEM_BASE_PATHS.staticAuto;
-  const supportsSharedStaticFlow =
-    activeSystem === "staticManual" || activeSystem === "staticAuto";
+  const supportsSharedStaticFlow = activeSystem === "staticAuto";
   const supportsAutoTryOn = activeSystem === "staticAuto";
 
   useEffect(() => {
@@ -187,11 +179,11 @@ export default function App() {
     <main className="shell">
       <section className="hero">
         <p className="eyebrow">Multi-system hairstyle platform</p>
-        <h1>One home page, five try-on subsystems</h1>
+        <h1>One home page, four try-on subsystems</h1>
         <p>
-          The backend is now separated into static manual try-on, static auto try-on,
-          generative try-on, live 2D try-on, and live 3D try-on. The existing logic stays
-          in place and each subsystem now has its own backend mount.
+          The backend is now separated into static auto try-on, generative try-on,
+          live 2D try-on, and live 3D try-on. The existing logic stays in place and
+          each subsystem now has its own backend mount.
         </p>
       </section>
 
@@ -270,11 +262,7 @@ export default function App() {
           <section className="recommendations">
             <div className="section-heading">
               <h2>Recommended assets</h2>
-              <p>
-                {supportsAutoTryOn
-                  ? "Ready for automatic static 2D generation."
-                  : "Ready for manual positioning in the dedicated manual try-on workflow."}
-              </p>
+              <p>Ready for automatic static 2D generation.</p>
             </div>
             <div className="cards">
               {recommendations.map((item) => (
@@ -296,30 +284,19 @@ export default function App() {
                     {item.normalized_attributes.curl} /{" "}
                     {item.normalized_attributes.style_family.replace("_", " ")}
                   </small>
-                  {supportsAutoTryOn ? (
-                    <button onClick={() => runTryOn(item.asset_id)} disabled={isBusy}>
-                      {step === "tryon" && selectedAssetId === item.asset_id
-                        ? "Generating..."
-                        : "Try this"}
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      className="secondary-button"
-                      onClick={() => setSelectedAssetId(item.asset_id)}
-                    >
-                      Select asset
-                    </button>
-                  )}
+                  <button onClick={() => runTryOn(item.asset_id)} disabled={isBusy}>
+                    {step === "tryon" && selectedAssetId === item.asset_id
+                      ? "Generating..."
+                      : "Try this"}
+                  </button>
                 </article>
               ))}
             </div>
           </section>
 
           <section ref={resultRef} className="result panel">
-            <h2>{supportsAutoTryOn ? "Try-on result" : "Manual workflow slot"}</h2>
-            {supportsAutoTryOn ? (
-              step === "tryon" ? (
+            <h2>Try-on result</h2>
+            {step === "tryon" ? (
                 <p className="muted">Generating try-on preview...</p>
               ) : tryOn?.output_image_url ? (
                 <>
@@ -340,22 +317,7 @@ export default function App() {
                 <p className="error">{error}</p>
               ) : (
                 <p className="muted">Select a recommendation and generate the overlay.</p>
-              )
-            ) : recommendations.length ? (
-              <>
-                <p className="muted">
-                  This subsystem keeps the existing recommendation and segmentation flow, but the
-                  final drag-and-place interface remains a separate manual workspace.
-                </p>
-                <p className="status-pill subtle-pill">
-                  Selected asset: {selectedAssetId || "Choose one of the recommended assets"}
-                </p>
-              </>
-            ) : (
-              <p className="muted">
-                Upload an image and run the shared analysis pipeline to prepare manual asset selection.
-              </p>
-            )}
+              )}
           </section>
         </>
       ) : activeSystem === "generative" ? (
@@ -366,9 +328,9 @@ export default function App() {
         />
       ) : activeSystem === "live2d" ? (
         <PlaceholderPanel
-          title="Live 2D Try-On"
-          body="This subsystem has an isolated backend slot and is intentionally empty for now."
-          note="Reserved for future live 2D implementation."
+          title="Live 2D Demo Engine"
+          body="This subsystem now keeps the live webcam loop from the demo, but uses the project's own recommendation system, segmentation model, and static try-on asset bank."
+          note="Use the dedicated live_2d webcam runner or inspect /api/live-2d/info for project-runtime readiness."
         />
       ) : (
         <PlaceholderPanel

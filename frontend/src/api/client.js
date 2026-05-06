@@ -1,6 +1,5 @@
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000";
 export const SYSTEM_BASE_PATHS = {
-  staticManual: "/api/static-manual",
   staticAuto: "/api/static-auto",
   generative: "/api/generative",
   live2d: "/api/live-2d",

@@ -30,10 +30,10 @@ LANDMARKS_DIR = DEBUG_DIR / "landmarks"
 PREDICTIONS_DIR = OUTPUT_ROOT / "predictions"
 TRYON_DIR = OUTPUT_ROOT / "tryon_2d"
 
-MODEL_ASSETS_DIR = SYSTEM_ROOT / "models"
+MODEL_ASSETS_DIR = BACKEND_ROOT / "models"
 MEDIAPIPE_FACE_LANDMARKER_PATH = MODEL_ASSETS_DIR / "face_landmarker.task"
 FACE_TO_HAIR_MAPPER_CONFIG_PATH = (
-    SYSTEM_ROOT / "checkpoints" / "face_to_hair_mapper_light" / "mapper_config.json"
+    MODEL_ASSETS_DIR / "face_to_hair_mapper_light" / "mapper_config.json"
 )
 
 

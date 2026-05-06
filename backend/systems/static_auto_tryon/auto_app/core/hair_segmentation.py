@@ -6,12 +6,12 @@ from pathlib import Path
 import numpy as np
 from PIL import Image, ImageFilter
 
-from auto_app.config import PREDICTIONS_DIR, SYSTEM_ROOT
+from auto_app.config import MODEL_ASSETS_DIR, PREDICTIONS_DIR
 from auto_app.ml.inference import load_segmentation_checkpoint, predict_hair_mask
 from auto_app.ml.transforms import ResizeImage
 
 
-SEGMENTATION_CHECKPOINT_PATH = SYSTEM_ROOT / "checkpoints" / "hair_segmentation" / "v2_unet_product.pt"
+SEGMENTATION_CHECKPOINT_PATH = MODEL_ASSETS_DIR / "hair_segmentation" / "v2_unet_product.pt"
 SEGMENTATION_IMAGE_SIZE = (256, 256)
 SEGMENTATION_THRESHOLD = 0.5
 
