@@ -1,13 +1,20 @@
-# Hairstyle Recommender Live Tryon
+# Hairstyle Recommender Try-On
 
-Stage-based implementation of a hairstyle recommendation and virtual try-on system.
+Current repository state: focused on the static 2D try-on backend.
 
 Current focus:
 
-- Version 1: static image analysis, recommendation, and overlay try-on
-- Version 2: dataset-based hairstyle asset bank preparation
+- static image analysis
+- static hairstyle recommendation
+- static 2D try-on
 
-## Stage 1 run
+## Backend structure
+
+- `backend/systems/static_2d` - active static 2D backend
+- `backend/data` - shared data root (kept intact)
+- `backend/outputs` - shared runtime/output root
+
+## Static 2D run
 
 Backend:
 
@@ -28,6 +35,10 @@ Open:
 - `http://127.0.0.1:5173`
 - `http://127.0.0.1:8000/docs`
 
-Stage 1 uses the reviewed asset bank at:
+Install Python dependencies from:
+
+- `backend/systems/static_2d/requirements.txt`
+
+The current static system uses the reviewed asset bank at:
 
 - `backend/data/processed/stage1_asset_bank`

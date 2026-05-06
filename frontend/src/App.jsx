@@ -6,11 +6,9 @@ import {
   recommendHairstyles,
   resolveMediaUrl
 } from "./api/client.js";
-import LiveTryOn from "./pages/LiveTryOn.jsx";
 
 export default function App() {
   const resultRef = useRef(null);
-  const [mode, setMode] = useState("image");
   const [imageFile, setImageFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState("");
   const [analysis, setAnalysis] = useState(null);
@@ -81,7 +79,7 @@ export default function App() {
       setStep("done");
     } catch (err) {
       setStep("error");
-      setError(err instanceof Error ? err.message : "The live 2D pipeline failed.");
+      setError(err instanceof Error ? err.message : "The static 2D pipeline failed.");
     }
   }
 
@@ -103,47 +101,18 @@ export default function App() {
 
   const isBusy = step === "analyzing" || step === "recommending" || step === "tryon";
 
-  const modeSwitch = (
-    <nav className="mode-switch" aria-label="Try-on mode">
-      <button
-        className={mode === "image" ? "active" : "secondary-button"}
-        type="button"
-        onClick={() => setMode("image")}
-      >
-        Image try-on
-      </button>
-      <button
-        className={mode === "live" ? "active" : "secondary-button"}
-        type="button"
-        onClick={() => setMode("live")}
-      >
-        Live WebAR try-on
-      </button>
-    </nav>
-  );
-
-  if (mode === "live") {
-    return (
-      <main className="shell live-shell">
-        {modeSwitch}
-        <LiveTryOn />
-      </main>
-    );
-  }
-
   return (
     <main className="shell">
-      {modeSwitch}
       <section className="hero">
-        <p className="eyebrow">Version 4 strong 2D live try-on baseline</p>
+        <p className="eyebrow">Static 2D try-on system</p>
         <h1>Hairstyle recommendation and virtual try-on</h1>
         <p>
           Upload a face image, analyze face geometry, rank reviewed render-safe hairstyle assets,
-          predict a cleaned hair mask, and render a stronger 2D try-on preview.
+          predict a cleaned hair mask, and render a stronger static 2D try-on preview.
         </p>
         {assetBankSummary && (
           <p className="status-pill">
-            Active live bank: {assetBankSummary.asset_count} reviewed render-safe assets
+            Active asset bank: {assetBankSummary.asset_count} reviewed hairstyle assets
           </p>
         )}
       </section>
