@@ -2,41 +2,70 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 
-from app.api.routes_assets import router as assets_router
-from app.api.routes_face import router as face_router
-from app.api.routes_health import router as health_router
-from app.api.routes_prediction import router as prediction_router
-from app.api.routes_recommend import router as recommend_router
-from app.api.routes_tryon_2d import router as tryon_router
-from app.config import BACKEND_ROOT
+from app.factory import ALLOWED_ORIGINS
+from systems.generative_tryon.generative_app.main import app as generative_tryon_app
+from systems.live_2d.app.main import app as live_2d_app
+from systems.live_3d.app.main import app as live_3d_app
+from systems.static_auto_tryon.auto_app.main import app as static_auto_tryon_app
 
 
 app = FastAPI(
-    title="Hairstyle Recommender Live Tryon API",
+    title="Hairstyle Recommender Multi-System Backend",
     version="0.1.0",
-    description="Backend for the stronger 2D live try-on baseline with reviewed render-safe assets.",
+    description=(
+        "Gateway backend that separates the project into static auto try-on, "
+        "generative try-on, live 2D try-on, and live 3D try-on subsystems."
+    ),
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://127.0.0.1:5173",
-        "http://localhost:5173",
-        "http://127.0.0.1:5174",
-        "http://localhost:5174",
-    ],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-app.mount("/media", StaticFiles(directory=BACKEND_ROOT), name="media")
 
-app.include_router(health_router)
-app.include_router(assets_router)
-app.include_router(face_router)
-app.include_router(prediction_router)
-app.include_router(recommend_router)
-app.include_router(tryon_router)
+@app.get("/health")
+def health() -> dict[str, str]:
+    return {"status": "ok", "system": "gateway"}
+
+
+@app.get("/api/systems")
+def systems_catalog() -> dict[str, list[dict[str, str]]]:
+    return {
+        "systems": [
+            {
+                "id": "static-auto",
+                "name": "Static Auto Try-On",
+                "mount_path": "/api/static-auto",
+                "status": "active",
+            },
+            {
+                "id": "generative",
+                "name": "Generative Try-On",
+                "mount_path": "/api/generative",
+                "status": "experimental",
+            },
+            {
+                "id": "live-2d",
+                "name": "Live 2D Try-On",
+                "mount_path": "/api/live-2d",
+                "status": "empty",
+            },
+            {
+                "id": "live-3d",
+                "name": "Live 3D Try-On",
+                "mount_path": "/api/live-3d",
+                "status": "empty",
+            },
+        ]
+    }
+
+
+app.mount("/api/static-auto", static_auto_tryon_app)
+app.mount("/api/generative", generative_tryon_app)
+app.mount("/api/live-2d", live_2d_app)
+app.mount("/api/live-3d", live_3d_app)
