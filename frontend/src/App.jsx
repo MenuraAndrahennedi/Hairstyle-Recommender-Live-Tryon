@@ -2,11 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import {
   SYSTEM_BASE_PATHS,
   analyzeFace,
-  fetchAssets,
   fetchAssetBankSummary,
   fetchLive2dInfo,
-  fetchLiveTopTierAssets,
   generateGenerativePackage,
+  processLive2dFrame,
   generateTryOn,
   recommendHairstyles,
   resolveMediaUrl
@@ -929,57 +928,17 @@ function GenerativeTryOnScreen() {
   );
 }
 
-function Live2DOverlay({ selectedItem, analysis }) {
-  if (!selectedItem?.image_url || !analysis?.face_bbox || !analysis?.image_width || !analysis?.image_height) {
-    return null;
-  }
-
-  const { face_bbox: faceBox, image_width: width, image_height: height } = analysis;
-  const left = ((faceBox.x - faceBox.width * 0.25) / width) * 100;
-  const top = ((faceBox.y - faceBox.height * 0.55) / height) * 100;
-  const boxWidth = (faceBox.width * 1.5 / width) * 100;
-  const trackingLeft = (faceBox.x / width) * 100;
-  const trackingTop = (faceBox.y / height) * 100;
-  const trackingWidth = (faceBox.width / width) * 100;
-  const trackingHeight = (faceBox.height / height) * 100;
-
-  return (
-    <>
-      <div
-        className="live-overlay"
-        style={{
-          left: `${Math.max(left, 0)}%`,
-          top: `${Math.max(top, 0)}%`,
-          width: `${Math.min(boxWidth, 70)}%`,
-          "--asset-image": `url(${resolveMediaUrl(selectedItem.image_url, SYSTEM_BASE_PATHS.staticAuto)})`,
-          "--asset-mask": `url(${resolveMediaUrl(selectedItem.mask_url, SYSTEM_BASE_PATHS.staticAuto)})`
-        }}
-      />
-      <div
-        className="tracking-box"
-        style={{
-          left: `${trackingLeft}%`,
-          top: `${trackingTop}%`,
-          width: `${trackingWidth}%`,
-          height: `${trackingHeight}%`
-        }}
-      />
-    </>
-  );
-}
-
 function Live2DTryOnScreen() {
   const videoRef = useRef(null);
-  const [gender, setGender] = useState("female");
+  const selectedAssetRef = useRef("");
   const [liveInfo, setLiveInfo] = useState(null);
   const [cameraError, setCameraError] = useState("");
   const [cameraReady, setCameraReady] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [recommendations, setRecommendations] = useState([]);
-  const [candidateAssets, setCandidateAssets] = useState([]);
-  const [analysis, setAnalysis] = useState(null);
   const [selectedAssetId, setSelectedAssetId] = useState("");
   const [facingMode, setFacingMode] = useState("user");
+  const [processedFrameUrl, setProcessedFrameUrl] = useState("");
   const streamRef = useRef(null);
 
   useEffect(() => {
@@ -997,28 +956,8 @@ function Live2DTryOnScreen() {
       });
     return () => {
       cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function loadCandidateAssets() {
-      try {
-        const assets = await fetchAssets(SYSTEM_BASE_PATHS.staticAuto);
-        if (!cancelled) {
-          setCandidateAssets(assets);
-        }
-      } catch {
-        if (!cancelled) {
-          setCandidateAssets([]);
-        }
-      }
-    }
-    loadCandidateAssets();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+      };
+    }, []);
 
   useEffect(() => {
     let active = true;
@@ -1068,69 +1007,49 @@ function Live2DTryOnScreen() {
     };
   }, [facingMode]);
 
+  useEffect(() => {
+    selectedAssetRef.current = selectedAssetId;
+  }, [selectedAssetId]);
+
   async function captureFrameFile() {
     const video = videoRef.current;
     if (!video || !video.videoWidth || !video.videoHeight) {
       throw new Error("Camera frame is not ready yet.");
     }
 
+    const maxSide = 640;
+    const scale = Math.min(1, maxSide / Math.max(video.videoWidth, video.videoHeight));
     const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+    canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
     const context = canvas.getContext("2d");
+    if (!context) {
+      throw new Error("Could not initialize the live frame capture canvas.");
+    }
     context.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.72));
     if (!blob) {
       throw new Error("Could not capture a live frame.");
     }
-    return new File([blob], "live-frame.png", { type: "image/png" });
+    return new File([blob], "live-frame.jpg", { type: "image/jpeg" });
   }
 
-  async function refreshLiveRecommendations(nextGender = gender) {
+  async function refreshLiveFrame(nextSelectedAssetId = selectedAssetRef.current) {
     try {
       setIsRefreshing(true);
       setCameraError("");
+      if (liveInfo?.status !== "project_ready") {
+        throw new Error("Live 2D backend is not ready yet.");
+      }
       const frameFile = await captureFrameFile();
-      const nextAnalysis = await analyzeFace(frameFile, SYSTEM_BASE_PATHS.staticAuto);
-      if (!nextAnalysis.face_detected || !nextAnalysis.face_attributes) {
-        throw new Error(nextAnalysis.message || "Face not detected in the live frame.");
-      }
-      setAnalysis(nextAnalysis);
-      const recommended = await recommendHairstyles(
-        nextAnalysis.face_attributes,
-        nextGender,
-        12,
-        SYSTEM_BASE_PATHS.staticAuto
-      );
-      const candidateIds = new Set(
-        liveInfo?.readiness?.candidate_asset_ids ?? []
-      );
-      const filteredRecommendations = candidateIds.size
-        ? recommended.filter((item) => candidateIds.has(item.asset_id)).slice(0, RECOMMENDATION_COUNT)
-        : recommended.slice(0, RECOMMENDATION_COUNT);
-
-      if (filteredRecommendations.length) {
-        setRecommendations(filteredRecommendations);
-        setSelectedAssetId(filteredRecommendations[0]?.asset_id ?? "");
-        return;
-      }
-
-      const liveCandidates = candidateAssets
-        .filter((item) => candidateIds.has(item.asset_id))
-        .slice(0, RECOMMENDATION_COUNT);
-
-      if (liveCandidates.length) {
-        setRecommendations(liveCandidates);
-        setSelectedAssetId(liveCandidates[0]?.asset_id ?? "");
-        return;
-      }
-
-      const fallbackAssets = (await fetchLiveTopTierAssets()).slice(0, RECOMMENDATION_COUNT);
-      setRecommendations(fallbackAssets);
-      setSelectedAssetId(fallbackAssets[0]?.asset_id ?? "");
+      const payload = await processLive2dFrame(frameFile, nextSelectedAssetId);
+      setProcessedFrameUrl(payload.frame_data_url ?? "");
+      setRecommendations(payload.recommendations ?? []);
+      const nextSelected = payload.selected_asset_id ?? payload.recommendations?.[0]?.asset_id ?? "";
+      setSelectedAssetId(nextSelected);
     } catch (error) {
       setCameraError(
-        error instanceof Error ? error.message : "Could not refresh live recommendations."
+        error instanceof Error ? error.message : "Could not refresh the live 2D backend frame."
       );
     } finally {
       setIsRefreshing(false);
@@ -1138,15 +1057,25 @@ function Live2DTryOnScreen() {
   }
 
   useEffect(() => {
-    if (!cameraReady) return;
-    const timer = window.setTimeout(() => {
-      refreshLiveRecommendations(gender);
-    }, 500);
-    return () => window.clearTimeout(timer);
-  }, [cameraReady]);
+    if (!cameraReady || liveInfo?.status !== "project_ready") return;
+    let cancelled = false;
 
-  const selectedItem =
-    recommendations.find((item) => item.asset_id === selectedAssetId) ?? null;
+    async function loop() {
+      if (cancelled) return;
+      if (!isRefreshing) {
+        await refreshLiveFrame();
+      }
+      if (!cancelled) {
+        window.setTimeout(loop, 1000);
+      }
+    }
+
+    const timer = window.setTimeout(loop, 350);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [cameraReady, liveInfo, isRefreshing]);
 
   return (
     <section className="page live-page">
@@ -1170,11 +1099,11 @@ function Live2DTryOnScreen() {
         }
       />
 
-      <section className="glass-card live-stage-card">
-        <div className="stage-topbar">
-          <span className="live-chip">
-            <span className={`live-dot ${cameraReady ? "on" : ""}`} />
-            Live 2D Try-On
+        <section className="glass-card live-stage-card">
+          <div className="stage-topbar">
+            <span className="live-chip">
+              <span className={`live-dot ${cameraReady ? "on" : ""}`} />
+              Live 2D Try-On
           </span>
           <span className="camera-chip">
             <span className={`live-dot ${cameraReady ? "on" : ""}`} />
@@ -1183,8 +1112,12 @@ function Live2DTryOnScreen() {
         </div>
 
         <div className="live-stage">
-          <video ref={videoRef} className="live-video" playsInline muted />
-          <Live2DOverlay selectedItem={selectedItem} analysis={analysis} />
+          <video ref={videoRef} className="live-video live-video-source" playsInline muted />
+          {processedFrameUrl ? (
+            <img src={processedFrameUrl} alt="Live 2D backend output" className="live-video" />
+          ) : (
+            <div className="empty-panel">Waiting for backend live frame...</div>
+          )}
 
           <div className="live-stage-note">
             <SparkleIcon />
@@ -1192,7 +1125,7 @@ function Live2DTryOnScreen() {
               <strong>{cameraReady ? "Tracking your face" : "Waiting for camera"}</strong>
               <span>
                 {cameraReady
-                  ? "Applying hairstyle preview with backend-powered recommendations"
+                  ? "Rendering the actual backend live 2D try-on engine"
                   : "Allow camera access to continue"}
               </span>
             </div>
@@ -1212,26 +1145,18 @@ function Live2DTryOnScreen() {
 
         <div className="live-toolbar">
           <div className="gender-inline">
-            <span>Select Gender:</span>
-            <GenderToggle
-              value={gender}
-              onChange={(nextGender) => {
-                setGender(nextGender);
-                if (cameraReady) {
-                  refreshLiveRecommendations(nextGender);
-                }
-              }}
-            />
+            <span>Backend engine:</span>
+            <strong>Original live 2D try-on</strong>
           </div>
 
           <button
             type="button"
             className="secondary-pill"
-            onClick={() => refreshLiveRecommendations(gender)}
+            onClick={() => refreshLiveFrame()}
             disabled={!cameraReady || isRefreshing}
           >
             <RefreshIcon />
-            Refresh Styles
+            Refresh Live Frame
           </button>
         </div>
       </section>
@@ -1241,9 +1166,15 @@ function Live2DTryOnScreen() {
         subtitle="Tap a hairstyle to preview it live on you"
         recommendations={recommendations}
         selectedAssetId={selectedAssetId}
-        onSelect={(item) => setSelectedAssetId(item.asset_id)}
+        onSelect={(item) => {
+          setSelectedAssetId(item.asset_id);
+          selectedAssetRef.current = item.asset_id;
+          if (cameraReady && !isRefreshing) {
+            refreshLiveFrame(item.asset_id);
+          }
+        }}
         compact
-        mediaBasePath={SYSTEM_BASE_PATHS.staticAuto}
+        mediaBasePath={SYSTEM_BASE_PATHS.live2d}
         footer="Hairstyles are previewed in real-time. Your data is not stored."
       />
     </section>

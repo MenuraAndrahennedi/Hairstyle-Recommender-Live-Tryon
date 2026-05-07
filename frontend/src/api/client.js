@@ -119,3 +119,16 @@ export async function fetchLive2dInfo() {
   const response = await fetch(subsystemUrl(SYSTEM_BASE_PATHS.live2d, "/info"));
   return expectJson(response);
 }
+
+export async function processLive2dFrame(image, selectedAssetId = "") {
+  const formData = new FormData();
+  formData.append("image", image);
+  if (selectedAssetId) {
+    formData.append("selected_asset_id", selectedAssetId);
+  }
+  const response = await fetch(subsystemUrl(SYSTEM_BASE_PATHS.live2d, "/frame"), {
+    method: "POST",
+    body: formData
+  });
+  return expectJson(response);
+}
