@@ -8,6 +8,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
 
 from generative_app.bootstrap_static import ensure_static_2d_on_path
 from generative_app.config import media_url_for_path
+from generative_app.core.generative_inpaint_runner import run_generative_inpaint
 from generative_app.core.generative_tryon_pipeline import prepare_generative_tryon_package
 from generative_app.core.uploads import save_uploaded_image
 from generative_app.models.schemas import GenerativeTryOnPackageResponse
@@ -57,12 +58,33 @@ async def generate_generative_tryon_package(
         subject_hair_mask=subject_hair_mask,
     )
 
+    final_image_path = None
+    final_metadata_path = None
+    final_generation_completed = False
+    final_generation_error = None
+
+    if package is not None and package.get("manifest_path"):
+        try:
+            final_generation = run_generative_inpaint(package["manifest_path"])
+            final_image_path = final_generation.get("output_image_path")
+            final_metadata_path = final_generation.get("metadata_path")
+            final_generation_completed = True
+        except Exception as exc:  # pragma: no cover - route fallback
+            logger.exception("Final generative inpaint failed: %s", exc)
+            final_generation_error = str(exc)
+
     return GenerativeTryOnPackageResponse(
         success=package is not None,
         message=(
-            "Generative try-on package prepared successfully."
-            if package is not None
-            else "Face was not detected, so the generative try-on package was not generated."
+            (
+                "Generative try-on package prepared and final image generated successfully."
+                if final_generation_completed
+                else (
+                    "Generative try-on package prepared successfully, but final generation is unavailable."
+                    if package is not None
+                    else "Face was not detected, so the generative try-on package was not generated."
+                )
+            )
         ),
         asset_id=asset_id,
         input_image_path=saved["saved_path"],
@@ -83,6 +105,12 @@ async def generate_generative_tryon_package(
         manifest_url=media_url_for_path(package["manifest_path"]) if package is not None else None,
         prompt_path=package["prompt_path"] if package is not None else None,
         prompt_url=media_url_for_path(package["prompt_path"]) if package is not None else None,
+        final_image_path=str(final_image_path) if final_image_path is not None else None,
+        final_image_url=media_url_for_path(final_image_path) if final_image_path is not None else None,
+        final_metadata_path=str(final_metadata_path) if final_metadata_path is not None else None,
+        final_metadata_url=media_url_for_path(final_metadata_path) if final_metadata_path is not None else None,
+        final_generation_completed=final_generation_completed,
+        final_generation_error=final_generation_error,
         face_detected=analysis.face_detected,
         face_bbox=analysis.face_bbox,
     )
