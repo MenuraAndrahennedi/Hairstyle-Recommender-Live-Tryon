@@ -16,7 +16,7 @@ def _ensure_torch() -> None:
     if torch is None:
         raise ModuleNotFoundError(
             "PyTorch is required for tensor-based transforms. "
-            "Install the packages from backend/systems/static_2d/requirements.txt before running the notebooks."
+            "Install the packages from the project root requirements.txt before running the notebooks."
         )
 
 

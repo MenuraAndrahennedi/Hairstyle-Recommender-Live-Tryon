@@ -1,0 +1,59 @@
+{
+  "asset_id": "celeba_hair_000222",
+  "source_dataset": "CelebA",
+  "original_celeba_file": "000372.jpg",
+  "raw_image_path": "D:\\Projects\\Personal Projects\\Hairstyle Recommender Live Tryon\\backend\\data\\raw\\celeba\\img_align_celeba\\img_align_celeba\\000372.jpg",
+  "raw_mask_path": "D:\\Projects\\Personal Projects\\Hairstyle Recommender Live Tryon\\backend\\data\\datasets\\celeba_hair_rich\\segmentation_masks\\000372_hair_mask.png",
+  "image_path": "D:\\Projects\\Personal Projects\\Hairstyle Recommender Live Tryon\\backend\\data\\processed\\celeba_hair_rich_assets\\images\\celeba_hair_000222.png",
+  "mask_path": "D:\\Projects\\Personal Projects\\Hairstyle Recommender Live Tryon\\backend\\data\\processed\\celeba_hair_rich_assets\\masks\\celeba_hair_000222_mask.png",
+  "partition": "train",
+  "gender_label": "female",
+  "quality_score": 0.96,
+  "confidence_bucket": "medium",
+  "quality_flags": [
+    "touches_top_edge",
+    "usable_candidate"
+  ],
+  "hair_mask_stats": {
+    "positive_pixels": 13895,
+    "coverage_ratio": 0.358082,
+    "bbox_x": 25,
+    "bbox_y": 0,
+    "bbox_width": 153,
+    "bbox_height": 218
+  },
+  "crop_box": {
+    "left": 1,
+    "top": 0,
+    "right": 178,
+    "bottom": 218
+  },
+  "crop_size": {
+    "width": 177,
+    "height": 218
+  },
+  "celeba_attribute_hints": {
+    "positive_fields": [
+      "Wavy_Hair"
+    ],
+    "color_hint": null,
+    "texture_hint": "Wavy_Hair",
+    "bangs_hint": false,
+    "male_hint": false,
+    "receding_hairline_hint": false
+  },
+  "labeling": {
+    "status": "seed_from_celeba_attributes",
+    "taxonomy_source": "CelebA_native_attributes",
+    "normalized_attributes": {
+      "length": null,
+      "curl": null,
+      "bang": null,
+      "volume": null,
+      "side_hair": null,
+      "color": null,
+      "style_family": null
+    },
+    "notes": ""
+  }
+}

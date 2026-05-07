@@ -10,6 +10,7 @@ from typing import Callable, Iterable
 from PIL import Image
 
 from support_app.config import PROJECT_ROOT
+from support_app.ml.khairstyle_translation import build_normalized_attributes, translate_labels
 
 try:
     import torch
@@ -41,9 +42,9 @@ PROCESSED_STAGE1_REVIEW_CSV = (
     / "manual_labels"
     / "celebamask_hq_label_template.csv"
 )
-PROCESSED_KHAIRSTYLE_METADATA_DIR = (
-    PROJECT_ROOT / "backend" / "data" / "processed" / "hairstyle_assets" / "metadata"
-)
+RAW_KHAIRSTYLE_ROOT = PROJECT_ROOT / "backend" / "data" / "raw" / "khairstyle" / "mqset"
+RAW_KHAIRSTYLE_LABEL_DIR = RAW_KHAIRSTYLE_ROOT / "labels" / "labels_mqset"
+RAW_KHAIRSTYLE_IMAGE_DIR = RAW_KHAIRSTYLE_ROOT / "images" / "images_mqset001"
 
 
 @dataclass(frozen=True)
@@ -82,7 +83,7 @@ def _ensure_torch() -> None:
     if torch is None:
         raise ModuleNotFoundError(
             "PyTorch is required for dataset tensors and training. "
-            "Install the packages from backend/systems/static_2d/requirements.txt before running the notebooks."
+            "Install the packages from the project root requirements.txt before running the notebooks."
         )
 
 
@@ -163,19 +164,38 @@ def build_attribute_records_from_khairstyle(
     metadata_dir: str | Path | None = None,
     limit: int | None = None,
 ) -> list[dict[str, object]]:
-    directory = _resolve_project_path(metadata_dir or PROCESSED_KHAIRSTYLE_METADATA_DIR)
+    directory = _resolve_project_path(metadata_dir or RAW_KHAIRSTYLE_LABEL_DIR)
     records: list[dict[str, object]] = []
 
-    for metadata_path in sorted(directory.glob("*.json")):
-        payload = json.loads(metadata_path.read_text(encoding="utf-8"))
-        labels = payload.get("normalized_attributes", {})
+    for metadata_path in sorted(directory.rglob("*.json")):
+        payload = json.loads(metadata_path.read_text(encoding="utf-8", errors="replace"))
+        translated_labels = translate_labels(payload)
+        labels = build_normalized_attributes(translated_labels)
         if not all(labels.get(field) for field in ATTRIBUTE_FIELDS):
             continue
+
+        relative_parent = metadata_path.relative_to(directory).parent
+        filename = str(payload.get("filename") or "").strip()
+        image_candidates = []
+        if filename:
+            image_candidates.append(RAW_KHAIRSTYLE_IMAGE_DIR / relative_parent / filename)
+        image_candidates.extend(
+            [
+                RAW_KHAIRSTYLE_IMAGE_DIR / relative_parent / f"{metadata_path.stem}.jpg",
+                RAW_KHAIRSTYLE_IMAGE_DIR / relative_parent / f"{metadata_path.stem.replace('_', '-')}.jpg",
+                RAW_KHAIRSTYLE_IMAGE_DIR / relative_parent / f"{metadata_path.stem}.png",
+                RAW_KHAIRSTYLE_IMAGE_DIR / relative_parent / f"{metadata_path.stem.replace('_', '-')}.png",
+            ]
+        )
+        image_path = next((candidate for candidate in image_candidates if candidate.exists()), None)
+        if image_path is None:
+            continue
+
         records.append(
             AttributeRecord(
-                image_path=str(payload["image_path"]),
+                image_path=_project_relative(image_path),
                 labels={field: str(labels[field]) for field in ATTRIBUTE_FIELDS},
-                source_id=str(payload["asset_id"]),
+                source_id=str(payload.get("id") or metadata_path.stem),
                 source_dataset="K-Hairstyle",
             ).to_dict()
         )

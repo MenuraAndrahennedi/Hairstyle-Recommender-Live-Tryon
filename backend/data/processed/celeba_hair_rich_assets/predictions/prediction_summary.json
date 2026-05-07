@@ -1,0 +1,13 @@
+{
+  "total_assets": 250,
+  "pred_length_counts": {
+    "short": 230,
+    "long": 20
+  },
+  "pred_curl_counts": {
+    "straight": 203,
+    "wavy": 47
+  },
+  "avg_length_confidence": 0.6599,
+  "avg_curl_confidence": 0.637
+}

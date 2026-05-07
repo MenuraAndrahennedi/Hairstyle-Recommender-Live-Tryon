@@ -1,0 +1,55 @@
+{
+  "asset_id": "celebamask_hair_000033",
+  "source_dataset": "CelebAMask-HQ",
+  "source_hq_id": 66,
+  "source_hq_image": "backend/data/raw/celebamask_hq/CelebA-HQ-img/66.jpg",
+  "source_hair_mask": "backend/data/raw/celebamask_hq/CelebAMask-HQ-mask-anno/0/00066_hair.png",
+  "original_celeba_file": "018839.jpg",
+  "image_path": "backend/data/processed/celebamask_hq_hair_assets/images/celebamask_hair_000033.png",
+  "mask_path": "backend/data/processed/celebamask_hq_hair_assets/masks/celebamask_hair_000033_mask.png",
+  "crop_box": {
+    "left": 0,
+    "top": 0,
+    "right": 1024,
+    "bottom": 1024
+  },
+  "full_image_mask_bbox": {
+    "left": 0,
+    "top": 10,
+    "right": 942,
+    "bottom": 1024
+  },
+  "crop_size": {
+    "width": 1024,
+    "height": 1024
+  },
+  "pose": {
+    "yaw": -0.291893,
+    "pitch": -13.258926,
+    "raw": 0.9239502
+  },
+  "celeba_attribute_hints": {
+    "positive_fields": [
+      "Brown_Hair",
+      "Wavy_Hair"
+    ],
+    "color_hint": "Brown_Hair",
+    "texture_hint": "Wavy_Hair",
+    "bangs_hint": false,
+    "male_hint": false
+  },
+  "labeling": {
+    "status": "needs_manual_khairstyle_taxonomy_label",
+    "taxonomy_source": "K-Hairstyle",
+    "normalized_attributes": {
+      "length": null,
+      "curl": null,
+      "bang": null,
+      "volume": null,
+      "side_hair": null,
+      "color": null,
+      "style_family": null
+    },
+    "notes": ""
+  }
+}

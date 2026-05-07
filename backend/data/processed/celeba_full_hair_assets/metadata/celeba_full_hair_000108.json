@@ -1,0 +1,80 @@
+{
+  "asset_id": "celeba_full_hair_000108",
+  "source_dataset": "CelebA_full_hair",
+  "original_celeba_file": "002565.jpg",
+  "raw_image_path": "D:\\Projects\\Personal Projects\\Hairstyle Recommender Live Tryon\\backend\\data\\raw\\celeba\\img_align_celeba\\img_align_celeba\\002565.jpg",
+  "raw_mask_path": "D:\\Projects\\Personal Projects\\Hairstyle Recommender Live Tryon\\backend\\data\\datasets\\celeba_hair_rich\\segmentation_masks\\002565_hair_mask.png",
+  "image_path": "D:\\Projects\\Personal Projects\\Hairstyle Recommender Live Tryon\\backend\\data\\processed\\celeba_full_hair_assets\\images\\celeba_full_hair_000108.png",
+  "mask_path": "D:\\Projects\\Personal Projects\\Hairstyle Recommender Live Tryon\\backend\\data\\processed\\celeba_full_hair_assets\\masks\\celeba_full_hair_000108_mask.png",
+  "partition": "train",
+  "gender_label": "male",
+  "quality_score": 1.0,
+  "confidence_bucket": "high",
+  "quality_flags": [
+    "usable_candidate"
+  ],
+  "hair_mask_stats": {
+    "positive_pixels": 8104,
+    "coverage_ratio": 0.208844,
+    "bbox_x": 8,
+    "bbox_y": 12,
+    "bbox_width": 151,
+    "bbox_height": 167
+  },
+  "mask_topology_stats": {
+    "component_count": 1,
+    "largest_component_pixels": 8104,
+    "secondary_component_pixels": 0,
+    "stray_pixels": 0,
+    "stray_ratio": 0.0
+  },
+  "mask_shape_stats": {
+    "top_band_coverage": 0.186834,
+    "top_band_span_ratio": 0.44382,
+    "side_bias_ratio": 0.191757,
+    "outer_side_ratio": 0.333539,
+    "top_rows_with_pixels": 27
+  },
+  "crop_box": {
+    "left": 0,
+    "top": 0,
+    "right": 178,
+    "bottom": 192
+  },
+  "crop_size": {
+    "width": 178,
+    "height": 192
+  },
+  "celeba_attribute_hints": {
+    "positive_fields": [
+      "Male",
+      "Black_Hair",
+      "Wavy_Hair",
+      "Receding_Hairline"
+    ],
+    "color_hint": "Black_Hair",
+    "texture_hint": "Wavy_Hair",
+    "bangs_hint": false,
+    "male_hint": true,
+    "receding_hairline_hint": true
+  },
+  "labeling": {
+    "status": "seed_from_celeba_attributes",
+    "taxonomy_source": "CelebA_native_attributes",
+    "normalized_attributes": {
+      "length": null,
+      "curl": null,
+      "bang": null,
+      "volume": null,
+      "side_hair": null,
+      "color": null,
+      "style_family": null
+    },
+    "notes": ""
+  },
+  "full_hair_score": 1.0,
+  "full_hair_flags": [
+    "full_hair_candidate"
+  ],
+  "full_hair_candidate": true
+}

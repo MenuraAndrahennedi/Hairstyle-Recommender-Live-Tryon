@@ -1,0 +1,59 @@
+{
+  "celeba_full_hair_000082": {
+    "anchors": {
+      "left_hairline": [66.0, 65.0],
+      "right_hairline": [80.0, 65.0],
+      "left_outer_hairline": [21.0, 65.0],
+      "right_outer_hairline": [152.0, 65.0],
+      "scalp_left": [27.0, 79.0],
+      "scalp_right": [146.0, 79.0],
+      "crown_top_left": [32.0, 42.0],
+      "crown_top_right": [141.0, 42.0],
+      "crown_center": [86.5, 42.0],
+      "open_center": [73.0, 65.0]
+    },
+    "regions": {
+      "crown_bottom_y": 79,
+      "left_split_x": 72,
+      "right_split_x": 74
+    }
+  },
+  "celeba_full_hair_000108": {
+    "anchors": {
+      "left_hairline": [71.0, 51.0],
+      "right_hairline": [87.0, 51.0],
+      "left_outer_hairline": [31.0, 51.0],
+      "right_outer_hairline": [142.0, 51.0],
+      "scalp_left": [36.0, 67.0],
+      "scalp_right": [137.0, 67.0],
+      "crown_top_left": [31.0, 49.0],
+      "crown_top_right": [142.0, 49.0],
+      "crown_center": [86.5, 49.0],
+      "open_center": [79.0, 51.0]
+    },
+    "regions": {
+      "crown_bottom_y": 67,
+      "left_split_x": 77,
+      "right_split_x": 81
+    }
+  },
+  "celeba_full_hair_000111": {
+    "anchors": {
+      "left_hairline": [54.0, 60.0],
+      "right_hairline": [70.0, 60.0],
+      "left_outer_hairline": [30.0, 60.0],
+      "right_outer_hairline": [143.0, 60.0],
+      "scalp_left": [34.0, 74.0],
+      "scalp_right": [139.0, 74.0],
+      "crown_top_left": [39.0, 42.0],
+      "crown_top_right": [132.0, 42.0],
+      "crown_center": [85.5, 42.0],
+      "open_center": [62.0, 60.0]
+    },
+    "regions": {
+      "crown_bottom_y": 74,
+      "left_split_x": 62,
+      "right_split_x": 62
+    }
+  }
+}
