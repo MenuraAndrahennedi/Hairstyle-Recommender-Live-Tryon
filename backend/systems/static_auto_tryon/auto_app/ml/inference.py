@@ -48,7 +48,12 @@ def load_hairstyle_attribute_checkpoint(
     label_vocab = payload["label_vocab"]
     core_fields = tuple(payload.get("core_fields", tuple(label_vocab.keys())))
     attribute_vocab_sizes = {field: len(label_vocab[field]) for field in core_fields}
-    model = build_attribute_model(attribute_vocab_sizes=attribute_vocab_sizes, base_channels=32, dropout=0.2)
+    model = build_attribute_model(
+        attribute_vocab_sizes=attribute_vocab_sizes,
+        base_channels=int(payload.get("base_channels", 32)),
+        dropout=float(payload.get("dropout", 0.2)),
+        architecture=str(payload.get("architecture", "cnn_small")),
+    )
     model.load_state_dict(payload["model_state_dict"])
     model.to(device)
     model.eval()
