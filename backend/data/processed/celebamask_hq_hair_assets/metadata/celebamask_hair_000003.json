@@ -1,0 +1,55 @@
+{
+  "asset_id": "celebamask_hair_000003",
+  "source_dataset": "CelebAMask-HQ",
+  "source_hq_id": 10,
+  "source_hq_image": "backend/data/raw/celebamask_hq/CelebA-HQ-img/10.jpg",
+  "source_hair_mask": "backend/data/raw/celebamask_hq/CelebAMask-HQ-mask-anno/0/00010_hair.png",
+  "original_celeba_file": "157746.jpg",
+  "image_path": "backend/data/processed/celebamask_hq_hair_assets/images/celebamask_hair_000003.png",
+  "mask_path": "backend/data/processed/celebamask_hq_hair_assets/masks/celebamask_hair_000003_mask.png",
+  "crop_box": {
+    "left": 33,
+    "top": 0,
+    "right": 859,
+    "bottom": 584
+  },
+  "full_image_mask_bbox": {
+    "left": 142,
+    "top": 68,
+    "right": 750,
+    "bottom": 506
+  },
+  "crop_size": {
+    "width": 826,
+    "height": 584
+  },
+  "pose": {
+    "yaw": -8.455429,
+    "pitch": 1.3948288,
+    "raw": -1.3228912
+  },
+  "celeba_attribute_hints": {
+    "positive_fields": [
+      "Male",
+      "Receding_Hairline"
+    ],
+    "color_hint": null,
+    "texture_hint": null,
+    "bangs_hint": false,
+    "male_hint": true
+  },
+  "labeling": {
+    "status": "needs_manual_khairstyle_taxonomy_label",
+    "taxonomy_source": "K-Hairstyle",
+    "normalized_attributes": {
+      "length": null,
+      "curl": null,
+      "bang": null,
+      "volume": null,
+      "side_hair": null,
+      "color": null,
+      "style_family": null
+    },
+    "notes": ""
+  }
+}

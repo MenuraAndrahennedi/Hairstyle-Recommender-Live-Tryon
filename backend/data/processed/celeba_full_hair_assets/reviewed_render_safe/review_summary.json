@@ -1,0 +1,15 @@
+{
+  "total_assets_reviewed": 209,
+  "kept_assets": 83,
+  "rejected_assets": 74,
+  "missing_or_undecided": 52,
+  "kept_gender_counts": {
+    "female": 44,
+    "male": 39
+  },
+  "kept_partition_counts": {
+    "train": 57,
+    "test": 14,
+    "val": 12
+  }
+}

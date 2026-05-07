@@ -51,10 +51,11 @@ desktop.ini
 
 # Model checkpoints, generated datasets, cached outputs
 checkpoints/
-data/
+backend/data/datasets
+backend/data/raw
 outputs/
 models/
-backend/models/
+
 
 # Logs and temporary files
 logs/

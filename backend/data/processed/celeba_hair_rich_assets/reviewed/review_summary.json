@@ -1,0 +1,15 @@
+{
+  "total_metadata_rows": 250,
+  "total_review_rows": 250,
+  "kept_assets": 120,
+  "rejected_assets": 130,
+  "missing_or_undecided_assets": 0,
+  "kept_by_gender": {
+    "female": 71,
+    "male": 49
+  },
+  "kept_by_confidence": {
+    "high": 77,
+    "medium": 43
+  }
+}

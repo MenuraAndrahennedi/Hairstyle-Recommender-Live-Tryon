@@ -1,0 +1,16 @@
+{
+  "total_assets": 209,
+  "render_safe_candidates": 157,
+  "accepted_ratio": 0.7512,
+  "avg_render_safe_score": 0.9167,
+  "flag_counts": {
+    "render_safe_candidate": 157,
+    "asymmetric_side_mass": 28,
+    "low_full_hair_score": 25,
+    "not_high_confidence": 14,
+    "short_mask": 12,
+    "narrow_mask": 7,
+    "high_coverage": 2,
+    "heavy_outer_side_mass": 1
+  }
+}

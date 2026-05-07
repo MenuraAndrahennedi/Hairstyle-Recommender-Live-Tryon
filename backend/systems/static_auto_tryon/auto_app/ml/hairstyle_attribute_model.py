@@ -11,7 +11,7 @@ def _ensure_torch() -> None:
     if torch is None or nn is None:
         raise ModuleNotFoundError(
             "PyTorch is required for hairstyle attribute models. "
-            "Install the packages from backend/systems/static_2d/requirements.txt before running the notebooks."
+            "Install the packages from the project root requirements.txt before running the notebooks."
         )
 
 

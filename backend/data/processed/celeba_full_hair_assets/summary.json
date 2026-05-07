@@ -1,0 +1,21 @@
+{
+  "source_dataset": "celeba_full_hair",
+  "asset_root": "D:\\Projects\\Personal Projects\\Hairstyle Recommender Live Tryon\\backend\\data\\processed\\celeba_full_hair_assets",
+  "total_assets": 209,
+  "lightweight_mode": false,
+  "partition_counts": {
+    "train": 148,
+    "val": 30,
+    "test": 31
+  },
+  "gender_counts": {
+    "female": 99,
+    "male": 110
+  },
+  "confidence_counts": {
+    "high": 195,
+    "medium": 14
+  },
+  "avg_quality_score": 1.0,
+  "avg_full_hair_score": 0.9821
+}
