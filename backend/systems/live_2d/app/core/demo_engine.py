@@ -13,6 +13,7 @@ from ..config import FACE_LANDMARKER_PATH
 from systems.static_auto_tryon.auto_app.config import (
     FULL_HAIR_ASSET_ROOT,
     REVIEWED_RENDER_SAFE_ASSET_BANK_JSONL,
+    media_url_for_path,
 )
 from systems.static_auto_tryon.auto_app.core.asset_bank import (
     asset_bank_summary,
@@ -288,6 +289,47 @@ class Live2DDemoEngine:
             if asset.asset_id == selected_asset_id:
                 return asset
         return None
+
+    def set_selected_asset_by_id(self, asset_id: str) -> bool:
+        for index, item in enumerate(self.current_recommendations):
+            if item.asset_id == asset_id:
+                self.selected_index = index
+                self.reset_smoothing()
+                return True
+        return False
+
+    def current_response_payload(self) -> dict[str, Any]:
+        selected_asset = self._selected_asset()
+        recommendations = []
+        for item in self.current_recommendations:
+            matched_asset = next(
+                (asset for asset in live_candidate_assets() if asset.asset_id == item.asset_id),
+                None,
+            )
+            if matched_asset is None:
+                continue
+            recommendations.append(
+                {
+                    "asset_id": item.asset_id,
+                    "score": float(item.score),
+                    "reason": item.reason,
+                    "gender_suitability": matched_asset.gender_suitability,
+                    "image_path": matched_asset.image_path,
+                    "mask_path": matched_asset.mask_path,
+                    "image_url": media_url_for_path(matched_asset.image_path),
+                    "mask_url": media_url_for_path(matched_asset.mask_path),
+                    "normalized_attributes": matched_asset.normalized_attributes.model_dump(),
+                }
+            )
+
+        return {
+            "face_detected": bool(self.current_face_analysis and self.current_face_analysis.face_detected),
+            "face_bbox": self.current_face_analysis.face_bbox if self.current_face_analysis else None,
+            "image_width": self.current_face_analysis.image_width if self.current_face_analysis else None,
+            "image_height": self.current_face_analysis.image_height if self.current_face_analysis else None,
+            "selected_asset_id": selected_asset.asset_id if selected_asset is not None else None,
+            "recommendations": recommendations,
+        }
 
     def load_project_hair_asset(self, asset: AssetMetadata) -> tuple[Any | None, Any | None]:
         image_path, mask_path = tryon_clean_paths(asset)

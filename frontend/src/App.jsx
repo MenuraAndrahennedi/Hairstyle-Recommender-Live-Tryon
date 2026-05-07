@@ -1,344 +1,1229 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   SYSTEM_BASE_PATHS,
   analyzeFace,
   fetchAssetBankSummary,
+  fetchLive2dInfo,
+  generateGenerativePackage,
+  processLive2dFrame,
   generateTryOn,
   recommendHairstyles,
   resolveMediaUrl
 } from "./api/client.js";
 
-const SYSTEMS = [
+const RECOMMENDATION_COUNT = 3;
+
+const HOME_CARDS = [
   {
-    id: "staticAuto",
-    label: "Static Auto Try-On",
-    badge: "Active",
-    eyebrow: "Subsystem 1",
-    summary:
-      "Upload, segment, recommend, and automatically generate static 2D try-on results with the current renderer."
+    id: "static",
+    title: "Static Tryon",
+    subtitle: "Upload a photo, get recommendations, and generate 2D try-on results.",
+    accent: "violet",
+    disabled: false
   },
   {
     id: "generative",
-    label: "Generative Try-On",
-    badge: "Experimental",
-    eyebrow: "Subsystem 2",
-    summary:
-      "Uses the separate generative package-building workflow and final inpainting experiments without changing the underlying logic."
+    title: "Generative Tryon",
+    subtitle: "Create AI-guided hairstyle try-on packages and previews.",
+    accent: "pink",
+    disabled: false
   },
   {
     id: "live2d",
-    label: "Live 2D Try-On",
-    badge: "Demo Ready",
-    eyebrow: "Subsystem 3",
-    summary:
-      "Dedicated webcam system using the project's own recommendation flow, segmentation model, and static try-on hair assets."
+    title: "Live 2D Tryon",
+    subtitle: "Use your webcam with real-time recommendation-driven preview tools.",
+    accent: "blue",
+    disabled: false
   },
   {
     id: "live3d",
-    label: "Live 3D Try-On",
-    badge: "Empty",
-    eyebrow: "Subsystem 4",
-    summary: "Reserved backend slot for future live 3D try-on work."
+    title: "Live 3D Tryon",
+    subtitle: "Reserved for future work.",
+    accent: "cyan",
+    disabled: true
   }
 ];
 
-function PlaceholderPanel({ title, body, note }) {
+const ABOUT_POINTS = [
+  "Static Auto Try-On generates direct 2D hairstyle previews from uploaded portraits.",
+  "Generative Try-On prepares and serves the AI-driven hairstyle editing workflow.",
+  "Live 2D Try-On uses browser webcam input while staying connected to the project backend."
+];
+
+const CONTACT_POINTS = [
+  "GitHub: MenuraAndrahennedi/Hairstyle-Recommender-Live-Tryon",
+  "Backend docs: http://127.0.0.1:8000/docs",
+  "Frontend expects the backend gateway to be running locally by default."
+];
+
+function LogoMark() {
   return (
-    <section className="panel subsystem-placeholder">
-      <h2>{title}</h2>
-      <p className="muted">{body}</p>
-      {note ? <p className="status-pill subtle-pill">{note}</p> : null}
+    <div className="brand-mark" aria-hidden="true">
+      <span className="brand-mark-core" />
+    </div>
+  );
+}
+
+function SparkleIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="icon" aria-hidden="true">
+      <path d="M12 2l1.8 5.2L19 9l-5.2 1.8L12 16l-1.8-5.2L5 9l5.2-1.8L12 2zM18.5 14l.9 2.6 2.6.9-2.6.9-.9 2.6-.9-2.6-2.6-.9 2.6-.9.9-2.6z" />
+    </svg>
+  );
+}
+
+function PhotoIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="icon" aria-hidden="true">
+      <path d="M4 5h16a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V7a2 2 0 012-2zm0 2v10h16V7H4zm3 8l3-4 2.4 3 1.8-2.2L18 15H7zm2-6.2A1.8 1.8 0 1110.8 7 1.8 1.8 0 019 8.8z" />
+    </svg>
+  );
+}
+
+function CameraIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="icon" aria-hidden="true">
+      <path d="M12 5a7 7 0 017 7v5a2 2 0 01-2 2H7a2 2 0 01-2-2v-5a7 7 0 017-7zm0 2a5 5 0 00-5 5v5h10v-5a5 5 0 00-5-5zm0-5l2.5 2.5h-5L12 2z" />
+    </svg>
+  );
+}
+
+function GlobeIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="icon" aria-hidden="true">
+      <path d="M12 2a10 10 0 100 20 10 10 0 000-20zm6.9 9h-3.2a15.3 15.3 0 00-1.4-5A8 8 0 0118.9 11zM12 4c1 1.2 1.9 3.8 2 7h-4c.1-3.2 1-5.8 2-7zM5.1 13h3.2a15.3 15.3 0 001.4 5A8 8 0 015.1 13zm0-2A8 8 0 019.7 6a15.3 15.3 0 00-1.4 5H5.1zm6.9 9c-1-1.2-1.9-3.8-2-7h4c-.1 3.2-1 5.8-2 7zm2.3-2a15.3 15.3 0 001.4-5h3.2a8 8 0 01-4.6 5z" />
+    </svg>
+  );
+}
+
+function UploadIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="icon" aria-hidden="true">
+      <path d="M12 3l4 4h-3v6h-2V7H8l4-4zm-7 9h2v6h10v-6h2v6a2 2 0 01-2 2H7a2 2 0 01-2-2v-6z" />
+    </svg>
+  );
+}
+
+function DownloadIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="icon" aria-hidden="true">
+      <path d="M11 3h2v9l3-3 1.4 1.4L12 16l-5.4-5.6L8 9l3 3V3zm-7 14h16v4H4v-4z" />
+    </svg>
+  );
+}
+
+function ShareIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="icon" aria-hidden="true">
+      <path d="M15 8a3 3 0 10-2.8-4H12a3 3 0 00.2 1L7.9 7.5a3 3 0 100 9l4.3 2.5A3 3 0 1013 17l-4.3-2.5a3 3 0 000-3L13 9a3 3 0 002 .8z" />
+    </svg>
+  );
+}
+
+function RefreshIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="icon" aria-hidden="true">
+      <path d="M18 7V3l-1.7 1.7A9 9 0 103 12h2a7 7 0 117 7 6.9 6.9 0 01-4.6-1.7L10 15H4v6l1.9-1.9A9 9 0 1021 12a9 9 0 00-3-6.7L18 7z" />
+    </svg>
+  );
+}
+
+function FlipIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="icon" aria-hidden="true">
+      <path d="M7 7h10l-2.5-2.5L16 3l5 5-5 5-1.5-1.5L17 9H7V7zm10 10H7l2.5 2.5L8 21l-5-5 5-5 1.5 1.5L7 15h10v2z" />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="icon small-icon" aria-hidden="true">
+      <path d="M9.6 16.2L5.4 12l1.4-1.4 2.8 2.8 7-7 1.4 1.4-8.4 8.4z" />
+    </svg>
+  );
+}
+
+function ThumbUpIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="icon small-icon" aria-hidden="true">
+      <path d="M14 3l-4 5v13h8a2 2 0 002-1.7l1-7A2 2 0 0019 10h-5l1-5-2-2zM3 10h5v11H3V10z" />
+    </svg>
+  );
+}
+
+function ThumbDownIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="icon small-icon" aria-hidden="true">
+      <path d="M10 21l4-5V3H6a2 2 0 00-2 1.7l-1 7A2 2 0 005 14h5l-1 5 2 2zm11-8h-5V2h5v11z" />
+    </svg>
+  );
+}
+
+function buildObjectUrl(file) {
+  return file ? URL.createObjectURL(file) : "";
+}
+
+function downloadFile(url, name) {
+  if (!url) return;
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = name;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+function useObjectUrl(file) {
+  const [objectUrl, setObjectUrl] = useState("");
+
+  useEffect(() => {
+    if (!file) {
+      setObjectUrl("");
+      return undefined;
+    }
+    const nextUrl = buildObjectUrl(file);
+    setObjectUrl(nextUrl);
+    return () => URL.revokeObjectURL(nextUrl);
+  }, [file]);
+
+  return objectUrl;
+}
+
+function TopNavigation({ currentView, onNavigate }) {
+  const activeNav = currentView === "about" || currentView === "contact"
+    ? currentView
+    : "home";
+
+  return (
+    <header className="topbar">
+      <button type="button" className="brand" onClick={() => onNavigate("home")}>
+        <LogoMark />
+        <div className="brand-copy">
+          <strong>Hairstyles</strong>
+          <span>Recommender and Tryon</span>
+        </div>
+      </button>
+
+      <nav className="nav">
+        <button
+          type="button"
+          className={`nav-link ${activeNav === "home" ? "active" : ""}`}
+          onClick={() => onNavigate("home")}
+        >
+          Home
+        </button>
+        <button
+          type="button"
+          className={`nav-link ${activeNav === "about" ? "active" : ""}`}
+          onClick={() => onNavigate("about")}
+        >
+          About Us
+        </button>
+        <button
+          type="button"
+          className={`nav-link ${activeNav === "contact" ? "active" : ""}`}
+          onClick={() => onNavigate("contact")}
+        >
+          Contact Us
+        </button>
+      </nav>
+    </header>
+  );
+}
+
+function SceneBackdrop() {
+  return (
+    <>
+      <div className="ambient ambient-left-top" />
+      <div className="ambient ambient-left-bottom" />
+      <div className="ambient ambient-right-top" />
+      <div className="ambient ambient-right-bottom" />
+      <div className="ambient-grid" />
+    </>
+  );
+}
+
+function SystemCard({ card, onOpen }) {
+  return (
+    <button
+      type="button"
+      className={`home-card ${card.accent} ${card.disabled ? "disabled" : ""}`}
+      onClick={() => !card.disabled && onOpen(card.id)}
+      disabled={card.disabled}
+    >
+      <div className="home-card-icon">
+        {card.id === "static" ? <PhotoIcon /> : null}
+        {card.id === "generative" ? <SparkleIcon /> : null}
+        {card.id === "live2d" ? <CameraIcon /> : null}
+        {card.id === "live3d" ? <GlobeIcon /> : null}
+      </div>
+      <div className="home-card-copy">
+        <strong>{card.title}</strong>
+        <span>{card.subtitle}</span>
+      </div>
+      <span className="home-card-arrow">{card.disabled ? "Soon" : "›"}</span>
+    </button>
+  );
+}
+
+function HomeScreen({ onOpenSystem }) {
+  return (
+    <section className="page home-page">
+      <div className="page-head home-head">
+        <h1>Hairstyles Recommender and Tryon</h1>
+        <p>
+          Discover the perfect hairstyle for you with AI-powered recommendations
+          and realistic try-on experiences.
+        </p>
+      </div>
+
+      <div className="home-grid">
+        {HOME_CARDS.map((card) => (
+          <SystemCard key={card.id} card={card} onOpen={onOpenSystem} />
+        ))}
+      </div>
     </section>
   );
 }
 
-export default function App() {
-  const resultRef = useRef(null);
-  const [activeSystem, setActiveSystem] = useState("staticAuto");
+function InfoScreen({ title, text, items }) {
+  return (
+    <section className="page info-page">
+      <div className="page-head compact-head">
+        <h1>{title}</h1>
+        <p>{text}</p>
+      </div>
+
+      <div className="glass-card info-card">
+        {items.map((item) => (
+          <p key={item}>{item}</p>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function GenderToggle({ value, onChange }) {
+  return (
+    <div className="gender-toggle">
+      <button
+        type="button"
+        className={value === "male" ? "active" : ""}
+        onClick={() => onChange("male")}
+      >
+        Male
+      </button>
+      <button
+        type="button"
+        className={value === "female" ? "active" : ""}
+        onClick={() => onChange("female")}
+      >
+        Female
+      </button>
+    </div>
+  );
+}
+
+function UploadCard({
+  title,
+  subtitle,
+  file,
+  previewUrl,
+  gender,
+  onFileChange,
+  onClear,
+  onGenderChange,
+  uploadLabel,
+  helper
+}) {
+  return (
+    <section className="glass-card upload-card">
+      <div className="section-title">
+        <div className="section-icon">
+          <UploadIcon />
+        </div>
+        <div>
+          <h2>{title}</h2>
+          <p>{subtitle}</p>
+        </div>
+      </div>
+
+      <div className="image-frame portrait-frame">
+        {previewUrl ? (
+          <img src={previewUrl} alt="Uploaded preview" className="cover-image" />
+        ) : (
+          <div className="empty-panel">Upload an image to begin</div>
+        )}
+        {file ? (
+          <button type="button" className="floating-close" onClick={onClear}>
+            ×
+          </button>
+        ) : null}
+      </div>
+
+      <label className="upload-cta">
+        <input
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          onChange={(event) => onFileChange(event.target.files?.[0] ?? null)}
+        />
+        <div className="upload-cta-copy">
+          <strong>{uploadLabel}</strong>
+          <span>JPG, PNG up to 10MB</span>
+        </div>
+      </label>
+
+      <div className="field-group">
+        <span className="field-label">Select Gender</span>
+        <GenderToggle value={gender} onChange={onGenderChange} />
+      </div>
+
+      {helper ? <p className="soft-note">{helper}</p> : null}
+    </section>
+  );
+}
+
+function RecommendationGrid({
+  title,
+  subtitle,
+  recommendations,
+  selectedAssetId,
+  onSelect,
+  footer,
+  action,
+  compact = false,
+  mediaBasePath = SYSTEM_BASE_PATHS.staticAuto
+}) {
+  return (
+    <section className="glass-card recommendation-panel">
+      <div className="section-title">
+        <div className="section-icon pink-icon">
+          <SparkleIcon />
+        </div>
+        <div>
+          <h2>{title}</h2>
+          <p>{subtitle}</p>
+        </div>
+      </div>
+
+      <div className={`recommendation-grid ${compact ? "compact-grid" : ""}`}>
+        {recommendations.map((item) => (
+          <button
+            key={item.asset_id}
+            type="button"
+            className={`style-card ${
+              selectedAssetId === item.asset_id ? "selected" : ""
+            }`}
+            onClick={() => onSelect(item)}
+          >
+            <div className="style-thumb">
+              {item.image_url ? (
+                <img
+                  src={resolveMediaUrl(item.image_url, mediaBasePath)}
+                  alt={item.asset_id}
+                  className="cover-image"
+                />
+              ) : (
+                <div className="empty-panel">No preview</div>
+              )}
+              {selectedAssetId === item.asset_id ? (
+                <span className="selected-badge">
+                  <CheckIcon />
+                </span>
+              ) : null}
+            </div>
+            <strong>{formatAssetName(item.asset_id, item.normalized_attributes)}</strong>
+          </button>
+        ))}
+      </div>
+
+      {action ? <div className="panel-action-row">{action}</div> : null}
+      {footer ? <p className="panel-footer">{footer}</p> : null}
+    </section>
+  );
+}
+
+function ResultCard({
+  title,
+  subtitle,
+  imageUrl,
+  children,
+  downloadLabel = "Download Image",
+  onDownload,
+  extraActions
+}) {
+  return (
+    <section className="glass-card result-card">
+      <div className="section-title">
+        <div className="section-icon result-icon">
+          <SparkleIcon />
+        </div>
+        <div>
+          <h2>{title}</h2>
+          <p>{subtitle}</p>
+        </div>
+      </div>
+
+      <div className="image-frame result-frame">
+        {imageUrl ? (
+          <img src={imageUrl} alt={title} className="cover-image" />
+        ) : (
+          <div className="empty-panel">Your result will appear here</div>
+        )}
+      </div>
+
+      <div className="result-actions">
+        <button type="button" className="primary-gradient" onClick={onDownload} disabled={!imageUrl}>
+          <DownloadIcon />
+          {downloadLabel}
+        </button>
+        {extraActions}
+      </div>
+
+      {children}
+    </section>
+  );
+}
+
+function StatusBanner({ state, error, message }) {
+  if (error) {
+    return <div className="status-banner error-banner">{error}</div>;
+  }
+  if (!message && !state) return null;
+  return <div className="status-banner">{message ?? state}</div>;
+}
+
+function formatAssetName(assetId, attrs) {
+  if (attrs?.style_family && attrs.style_family !== "other") {
+    return attrs.style_family
+      .split("_")
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(" ");
+  }
+  return assetId.replace("celeba_full_hair_", "").replaceAll("_", " ");
+}
+
+function chooseGenerativeImageUrl(result) {
+  return (
+    resolveMediaUrl(result?.final_image_url, SYSTEM_BASE_PATHS.generative) ||
+    resolveMediaUrl(result?.preview_url, SYSTEM_BASE_PATHS.generative) ||
+    resolveMediaUrl(result?.reference_image_url, SYSTEM_BASE_PATHS.generative) ||
+    resolveMediaUrl(result?.input_image_url, SYSTEM_BASE_PATHS.generative) ||
+    ""
+  );
+}
+
+function StaticTryOnScreen() {
+  const [gender, setGender] = useState("female");
   const [imageFile, setImageFile] = useState(null);
-  const [previewUrl, setPreviewUrl] = useState("");
   const [analysis, setAnalysis] = useState(null);
   const [recommendations, setRecommendations] = useState([]);
   const [selectedAssetId, setSelectedAssetId] = useState("");
-  const [targetGender, setTargetGender] = useState("male");
-  const [tryOn, setTryOn] = useState(null);
-  const [step, setStep] = useState("idle");
+  const [preparedResults, setPreparedResults] = useState({});
+  const [busyState, setBusyState] = useState("");
   const [error, setError] = useState("");
-  const [assetBankSummary, setAssetBankSummary] = useState(null);
-
-  const selectedSystem = useMemo(
-    () => SYSTEMS.find((item) => item.id === activeSystem) ?? SYSTEMS[0],
-    [activeSystem]
-  );
-  const subsystemBasePath =
-    SYSTEM_BASE_PATHS[activeSystem] ?? SYSTEM_BASE_PATHS.staticAuto;
-  const supportsSharedStaticFlow = activeSystem === "staticAuto";
-  const supportsAutoTryOn = activeSystem === "staticAuto";
+  const [summary, setSummary] = useState(null);
+  const previewUrl = useObjectUrl(imageFile);
 
   useEffect(() => {
-    if ((tryOn?.output_image_url || step === "tryon") && resultRef.current) {
-      resultRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  }, [step, tryOn]);
-
-  useEffect(() => {
-    setAnalysis(null);
-    setRecommendations([]);
-    setSelectedAssetId("");
-    setTryOn(null);
-    setError("");
-    setStep("idle");
-  }, [activeSystem]);
-
-  useEffect(() => {
-    let ignore = false;
-
-    async function loadSummary() {
-      if (!supportsSharedStaticFlow) {
-        setAssetBankSummary(null);
-        return;
-      }
-
-      try {
-        const summary = await fetchAssetBankSummary(subsystemBasePath);
-        if (!ignore) {
-          setAssetBankSummary(summary);
+    let cancelled = false;
+    fetchAssetBankSummary(SYSTEM_BASE_PATHS.staticAuto)
+      .then((payload) => {
+        if (!cancelled) {
+          setSummary(payload);
         }
-      } catch {
-        if (!ignore) {
-          setAssetBankSummary(null);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSummary(null);
         }
-      }
-    }
-
-    loadSummary();
+      });
     return () => {
-      ignore = true;
+      cancelled = true;
     };
-  }, [subsystemBasePath, supportsSharedStaticFlow]);
+  }, []);
 
-  function handleFileChange(file) {
+  async function runRecommendations(file, nextGender) {
+    setBusyState("Analyzing image and loading recommendations...");
+    setError("");
+    setPreparedResults({});
+    const nextAnalysis = await analyzeFace(file, SYSTEM_BASE_PATHS.staticAuto);
+    if (!nextAnalysis.face_detected || !nextAnalysis.face_attributes) {
+      throw new Error(nextAnalysis.message || "Face not detected.");
+    }
+    setAnalysis(nextAnalysis);
+    const nextRecommendations = await recommendHairstyles(
+      nextAnalysis.face_attributes,
+      nextGender,
+      RECOMMENDATION_COUNT,
+      SYSTEM_BASE_PATHS.staticAuto
+    );
+    setRecommendations(nextRecommendations);
+    setSelectedAssetId(nextRecommendations[0]?.asset_id ?? "");
+
+    if (!nextRecommendations.length) {
+      setBusyState("");
+      return;
+    }
+
+    setBusyState("Preparing try-on results...");
+    const generatedEntries = await Promise.all(
+      nextRecommendations.map(async (item) => [
+        item.asset_id,
+        await generateTryOn(file, item.asset_id, SYSTEM_BASE_PATHS.staticAuto)
+      ])
+    );
+    setPreparedResults(Object.fromEntries(generatedEntries));
+    setBusyState("");
+  }
+
+  async function handleFileChange(file) {
     setImageFile(file);
     setAnalysis(null);
     setRecommendations([]);
     setSelectedAssetId("");
-    setTryOn(null);
+    setPreparedResults({});
     setError("");
-    setStep("idle");
-    setPreviewUrl(file ? URL.createObjectURL(file) : "");
+    if (!file) return;
+    try {
+      await runRecommendations(file, gender);
+    } catch (nextError) {
+      setBusyState("");
+      setError(nextError instanceof Error ? nextError.message : "Static try-on failed.");
+    }
   }
 
-  async function runAnalysis() {
-    if (!imageFile || !supportsSharedStaticFlow) return;
+  async function handleSelect(item, file = imageFile) {
+    if (!file || !item?.asset_id) return;
+    setSelectedAssetId(item.asset_id);
+    if (preparedResults[item.asset_id]) {
+      return;
+    }
+    setBusyState("Generating static try-on...");
+    setError("");
     try {
-      setStep("analyzing");
-      setError("");
-      const nextAnalysis = await analyzeFace(imageFile, subsystemBasePath);
-      setAnalysis(nextAnalysis);
-      if (!nextAnalysis.face_detected || !nextAnalysis.face_attributes) {
-        setStep("error");
-        setError(nextAnalysis.message);
+      const nextResult = await generateTryOn(
+        file,
+        item.asset_id,
+        SYSTEM_BASE_PATHS.staticAuto
+      );
+      setPreparedResults((current) => ({
+        ...current,
+        [item.asset_id]: nextResult
+      }));
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "Static try-on failed.");
+    } finally {
+      setBusyState("");
+    }
+  }
+
+  async function handleGenderChange(nextGender) {
+    setGender(nextGender);
+    if (imageFile && analysis?.face_attributes) {
+      try {
+        setBusyState("Refreshing recommendations...");
+        const nextRecommendations = await recommendHairstyles(
+          analysis.face_attributes,
+          nextGender,
+          RECOMMENDATION_COUNT,
+          SYSTEM_BASE_PATHS.staticAuto
+        );
+        setRecommendations(nextRecommendations);
+        setSelectedAssetId(nextRecommendations[0]?.asset_id ?? "");
+        setPreparedResults({});
+        if (!nextRecommendations.length) {
+          setBusyState("");
+          return;
+        }
+        setBusyState("Preparing try-on results...");
+        const generatedEntries = await Promise.all(
+          nextRecommendations.map(async (item) => [
+            item.asset_id,
+            await generateTryOn(imageFile, item.asset_id, SYSTEM_BASE_PATHS.staticAuto)
+          ])
+        );
+        setPreparedResults(Object.fromEntries(generatedEntries));
+        setBusyState("");
+      } catch (nextError) {
+        setBusyState("");
+        setError(nextError instanceof Error ? nextError.message : "Could not refresh recommendations.");
+      }
+    }
+  }
+
+  const result = selectedAssetId ? preparedResults[selectedAssetId] ?? null : null;
+
+  return (
+    <section className="page system-page">
+      <StatusBanner
+        state={busyState}
+        error={error}
+        message={summary ? `Runtime asset bank: ${summary.asset_count} styles` : busyState}
+      />
+
+      <div className="three-panel-layout">
+        <UploadCard
+          title="Upload Image"
+          subtitle="Upload a clear front-facing photo"
+          file={imageFile}
+          previewUrl={previewUrl}
+          gender={gender}
+          onFileChange={handleFileChange}
+          onClear={() => handleFileChange(null)}
+          onGenderChange={handleGenderChange}
+          uploadLabel={imageFile ? "Change Photo" : "Upload Photo"}
+        />
+
+        <RecommendationGrid
+          title="Recommended Hairstyles"
+          subtitle="AI-generated styles for you"
+          recommendations={recommendations}
+          selectedAssetId={selectedAssetId}
+          onSelect={handleSelect}
+          footer="Click a hairstyle to see the try-on result"
+          mediaBasePath={SYSTEM_BASE_PATHS.staticAuto}
+        />
+
+        <ResultCard
+          title="Static Try-On Result"
+          subtitle="See how the hairstyle looks on you"
+          imageUrl={resolveMediaUrl(result?.output_image_url, SYSTEM_BASE_PATHS.staticAuto)}
+          onDownload={() =>
+            downloadFile(
+              resolveMediaUrl(result?.output_image_url, SYSTEM_BASE_PATHS.staticAuto),
+              `${selectedAssetId || "static-tryon"}.png`
+            )
+          }
+        />
+      </div>
+    </section>
+  );
+}
+
+function GenerativeTryOnScreen() {
+  const [gender, setGender] = useState("male");
+  const [imageFile, setImageFile] = useState(null);
+  const [analysis, setAnalysis] = useState(null);
+  const [recommendations, setRecommendations] = useState([]);
+  const [selectedAssetId, setSelectedAssetId] = useState("");
+  const [preparedPackages, setPreparedPackages] = useState({});
+  const [busyState, setBusyState] = useState("");
+  const [error, setError] = useState("");
+  const [feedback, setFeedback] = useState("");
+  const previewUrl = useObjectUrl(imageFile);
+
+  async function refreshRecommendations(file = imageFile, nextGender = gender) {
+    if (!file) return;
+    setBusyState("Analyzing image and refreshing generative suggestions...");
+    setError("");
+    const nextAnalysis = await analyzeFace(file, SYSTEM_BASE_PATHS.staticAuto);
+    if (!nextAnalysis.face_detected || !nextAnalysis.face_attributes) {
+      throw new Error(nextAnalysis.message || "Face not detected.");
+    }
+    setAnalysis(nextAnalysis);
+    const nextRecommendations = await recommendHairstyles(
+      nextAnalysis.face_attributes,
+      nextGender,
+      RECOMMENDATION_COUNT,
+      SYSTEM_BASE_PATHS.staticAuto
+    );
+    setRecommendations(nextRecommendations);
+    setSelectedAssetId(nextRecommendations[0]?.asset_id ?? "");
+    if (!nextRecommendations.length) {
+      setPreparedPackages({});
+      setBusyState("");
+      return;
+    }
+    setBusyState("Preparing generative previews...");
+    const generatedEntries = await Promise.all(
+      nextRecommendations.map(async (item) => [
+        item.asset_id,
+        await generateGenerativePackage(file, item.asset_id)
+      ])
+    );
+    setPreparedPackages(Object.fromEntries(generatedEntries));
+    setBusyState("");
+  }
+
+  async function handleFileChange(file) {
+    setImageFile(file);
+    setAnalysis(null);
+    setRecommendations([]);
+    setSelectedAssetId("");
+    setPreparedPackages({});
+    setError("");
+    setFeedback("");
+    if (!file) return;
+    try {
+      await refreshRecommendations(file, gender);
+    } catch (nextError) {
+      setBusyState("");
+      setError(nextError instanceof Error ? nextError.message : "Could not prepare generative try-on.");
+    }
+  }
+
+  async function handleSelect(item, file = imageFile) {
+    if (!file || !item?.asset_id) return;
+    setSelectedAssetId(item.asset_id);
+    if (preparedPackages[item.asset_id]) {
+      return;
+    }
+    setBusyState("Building generative package...");
+    setError("");
+    try {
+      const nextResult = await generateGenerativePackage(file, item.asset_id);
+      setPreparedPackages((current) => ({
+        ...current,
+        [item.asset_id]: nextResult
+      }));
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "Generative try-on failed.");
+    } finally {
+      setBusyState("");
+    }
+  }
+
+  async function handleGenderChange(nextGender) {
+    setGender(nextGender);
+    if (imageFile && analysis?.face_attributes) {
+      try {
+        setBusyState("Refreshing recommendations...");
+        const nextRecommendations = await recommendHairstyles(
+          analysis.face_attributes,
+          nextGender,
+          RECOMMENDATION_COUNT,
+          SYSTEM_BASE_PATHS.staticAuto
+        );
+        setRecommendations(nextRecommendations);
+        setSelectedAssetId(nextRecommendations[0]?.asset_id ?? "");
+        if (!nextRecommendations.length) {
+          setPreparedPackages({});
+          setBusyState("");
+          return;
+        }
+        setBusyState("Preparing generative previews...");
+        const generatedEntries = await Promise.all(
+          nextRecommendations.map(async (item) => [
+            item.asset_id,
+            await generateGenerativePackage(imageFile, item.asset_id)
+          ])
+        );
+        setPreparedPackages(Object.fromEntries(generatedEntries));
+        setBusyState("");
+      } catch (nextError) {
+        setBusyState("");
+        setError(nextError instanceof Error ? nextError.message : "Could not refresh recommendations.");
+      }
+    }
+  }
+
+  const result = selectedAssetId ? preparedPackages[selectedAssetId] ?? null : null;
+  const displayImageUrl = chooseGenerativeImageUrl(result);
+  const generativeMessage = result?.final_generation_completed
+    ? "Final generative result created successfully."
+    : result?.final_generation_error
+      ? `Final generation failed, showing prototype preview instead. ${result.final_generation_error}`
+      : result?.message || busyState;
+
+  return (
+    <section className="page system-page">
+      <StatusBanner
+        state={busyState}
+        error={error}
+        message={generativeMessage}
+      />
+
+      <div className="three-panel-layout">
+        <UploadCard
+          title="Upload Image"
+          subtitle="Upload a clear portrait for AI try-on"
+          file={imageFile}
+          previewUrl={previewUrl}
+          gender={gender}
+          onFileChange={handleFileChange}
+          onClear={() => handleFileChange(null)}
+          onGenderChange={handleGenderChange}
+          uploadLabel={imageFile ? "Upload Another Image" : "Upload Image"}
+          helper="Your photos are secure and private. We don't store your images."
+        />
+
+        <RecommendationGrid
+          title="Recommended Hairstyles"
+          subtitle="AI suggestions tailored for you"
+          recommendations={recommendations}
+          selectedAssetId={selectedAssetId}
+          onSelect={handleSelect}
+          footer=""
+          mediaBasePath={SYSTEM_BASE_PATHS.staticAuto}
+          action={
+            <button
+              type="button"
+              className="secondary-pill"
+              onClick={() => refreshRecommendations()}
+              disabled={!imageFile || Boolean(busyState)}
+            >
+              <RefreshIcon />
+              Refresh Recommendations
+            </button>
+          }
+        />
+
+        <ResultCard
+          title="Generative Result"
+          subtitle={
+            result?.final_generation_completed
+              ? "AI-generated final hairstyle result"
+              : "AI-generated try-on preview"
+          }
+          imageUrl={displayImageUrl}
+          onDownload={() =>
+            downloadFile(displayImageUrl, `${selectedAssetId || "generative-tryon"}.png`)
+          }
+          extraActions={
+            <button
+              type="button"
+              className="secondary-pill"
+              disabled={!displayImageUrl}
+              onClick={async () => {
+                if (!displayImageUrl) return;
+                if (navigator.share) {
+                  await navigator.share({
+                    title: result?.final_generation_completed
+                      ? "Generative Try-On Result"
+                      : "Generative Try-On Preview",
+                    url: displayImageUrl
+                  });
+                  return;
+                }
+                await navigator.clipboard.writeText(displayImageUrl);
+              }}
+            >
+              <ShareIcon />
+              Share
+            </button>
+          }
+        >
+          <div className="feedback-row">
+            <span>Happy with the result?</span>
+            <button
+              type="button"
+              className={`icon-pill ${feedback === "up" ? "active" : ""}`}
+              onClick={() => setFeedback("up")}
+            >
+              <ThumbUpIcon />
+            </button>
+            <button
+              type="button"
+              className={`icon-pill ${feedback === "down" ? "active" : ""}`}
+              onClick={() => setFeedback("down")}
+            >
+              <ThumbDownIcon />
+            </button>
+          </div>
+        </ResultCard>
+      </div>
+    </section>
+  );
+}
+
+function Live2DTryOnScreen() {
+  const videoRef = useRef(null);
+  const selectedAssetRef = useRef("");
+  const [liveInfo, setLiveInfo] = useState(null);
+  const [cameraError, setCameraError] = useState("");
+  const [cameraReady, setCameraReady] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [recommendations, setRecommendations] = useState([]);
+  const [selectedAssetId, setSelectedAssetId] = useState("");
+  const [facingMode, setFacingMode] = useState("user");
+  const [processedFrameUrl, setProcessedFrameUrl] = useState("");
+  const streamRef = useRef(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchLive2dInfo()
+      .then((payload) => {
+        if (!cancelled) {
+          setLiveInfo(payload);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setLiveInfo(null);
+        }
+      });
+    return () => {
+      cancelled = true;
+      };
+    }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    async function startCamera() {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setCameraError("Camera access is not supported in this browser.");
         return;
       }
 
-      setStep("recommending");
-      const nextRecommendations = await recommendHairstyles(
-        nextAnalysis.face_attributes,
-        targetGender,
-        6,
-        subsystemBasePath
-      );
-      setRecommendations(nextRecommendations);
-      setSelectedAssetId(nextRecommendations[0]?.asset_id ?? "");
-      setStep("done");
-    } catch (err) {
-      setStep("error");
-      setError(err instanceof Error ? err.message : "The selected subsystem failed.");
+      try {
+        setCameraError("");
+        setCameraReady(false);
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach((track) => track.stop());
+        }
+        const nextStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode },
+          audio: false
+        });
+        if (!active) {
+          nextStream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+        streamRef.current = nextStream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = nextStream;
+          await videoRef.current.play();
+          setCameraReady(true);
+        }
+      } catch (error) {
+        setCameraError(
+          error instanceof Error
+            ? error.message
+            : "Could not start the camera."
+        );
+      }
     }
+
+    startCamera();
+
+    return () => {
+      active = false;
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+      }
+    };
+  }, [facingMode]);
+
+  useEffect(() => {
+    selectedAssetRef.current = selectedAssetId;
+  }, [selectedAssetId]);
+
+  async function captureFrameFile() {
+    const video = videoRef.current;
+    if (!video || !video.videoWidth || !video.videoHeight) {
+      throw new Error("Camera frame is not ready yet.");
+    }
+
+    const maxSide = 640;
+    const scale = Math.min(1, maxSide / Math.max(video.videoWidth, video.videoHeight));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+    canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+    const context = canvas.getContext("2d");
+    if (!context) {
+      throw new Error("Could not initialize the live frame capture canvas.");
+    }
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.72));
+    if (!blob) {
+      throw new Error("Could not capture a live frame.");
+    }
+    return new File([blob], "live-frame.jpg", { type: "image/jpeg" });
   }
 
-  async function runTryOn(assetId = selectedAssetId) {
-    if (!imageFile || !assetId || !supportsAutoTryOn) return;
+  async function refreshLiveFrame(nextSelectedAssetId = selectedAssetRef.current) {
     try {
-      setStep("tryon");
-      setError("");
-      setSelectedAssetId(assetId);
-      setTryOn(null);
-      const nextTryOn = await generateTryOn(imageFile, assetId, subsystemBasePath);
-      setTryOn(nextTryOn);
-      setStep("done");
-    } catch (err) {
-      setStep("error");
-      setError(err instanceof Error ? err.message : "Try-on failed.");
+      setIsRefreshing(true);
+      setCameraError("");
+      if (liveInfo?.status !== "project_ready") {
+        throw new Error("Live 2D backend is not ready yet.");
+      }
+      const frameFile = await captureFrameFile();
+      const payload = await processLive2dFrame(frameFile, nextSelectedAssetId);
+      setProcessedFrameUrl(payload.frame_data_url ?? "");
+      setRecommendations(payload.recommendations ?? []);
+      const nextSelected = payload.selected_asset_id ?? payload.recommendations?.[0]?.asset_id ?? "";
+      setSelectedAssetId(nextSelected);
+    } catch (error) {
+      setCameraError(
+        error instanceof Error ? error.message : "Could not refresh the live 2D backend frame."
+      );
+    } finally {
+      setIsRefreshing(false);
     }
   }
 
-  const isBusy = step === "analyzing" || step === "recommending" || step === "tryon";
+  useEffect(() => {
+    if (!cameraReady || liveInfo?.status !== "project_ready") return;
+    let cancelled = false;
+
+    async function loop() {
+      if (cancelled) return;
+      if (!isRefreshing) {
+        await refreshLiveFrame();
+      }
+      if (!cancelled) {
+        window.setTimeout(loop, 1000);
+      }
+    }
+
+    const timer = window.setTimeout(loop, 350);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [cameraReady, liveInfo, isRefreshing]);
 
   return (
-    <main className="shell">
-      <section className="hero">
-        <p className="eyebrow">Multi-system hairstyle platform</p>
-        <h1>One home page, four try-on subsystems</h1>
-        <p>
-          The backend is now separated into static auto try-on, generative try-on,
-          live 2D try-on, and live 3D try-on. The existing logic stays in place and
-          each subsystem now has its own backend mount.
-        </p>
-      </section>
+    <section className="page live-page">
+      <div className="page-head live-head">
+        <div className="headline-with-icon">
+          <div className="headline-icon">
+            <CameraIcon />
+          </div>
+          <h1>Live 2D Tryon</h1>
+        </div>
+        <p>See hairstyles on you in real-time using your webcam.</p>
+      </div>
 
-      <section className="system-grid">
-        {SYSTEMS.map((system) => (
+      <StatusBanner
+        state={isRefreshing ? "Refreshing live recommendations..." : ""}
+        error={cameraError}
+        message={
+          liveInfo?.status === "project_ready"
+            ? `Live 2D backend ready with ${liveInfo.readiness?.tryon_clean_candidate_count ?? 0} clean overlay assets`
+            : ""
+        }
+      />
+
+        <section className="glass-card live-stage-card">
+          <div className="stage-topbar">
+            <span className="live-chip">
+              <span className={`live-dot ${cameraReady ? "on" : ""}`} />
+              Live 2D Try-On
+          </span>
+          <span className="camera-chip">
+            <span className={`live-dot ${cameraReady ? "on" : ""}`} />
+            Camera: {cameraReady ? "On" : "Off"}
+          </span>
+        </div>
+
+        <div className="live-stage">
+          <video ref={videoRef} className="live-video live-video-source" playsInline muted />
+          {processedFrameUrl ? (
+            <img src={processedFrameUrl} alt="Live 2D backend output" className="live-video" />
+          ) : (
+            <div className="empty-panel">Waiting for backend live frame...</div>
+          )}
+
+          <div className="live-stage-note">
+            <SparkleIcon />
+            <div>
+              <strong>{cameraReady ? "Tracking your face" : "Waiting for camera"}</strong>
+              <span>
+                {cameraReady
+                  ? "Rendering the actual backend live 2D try-on engine"
+                  : "Allow camera access to continue"}
+              </span>
+            </div>
+          </div>
+
           <button
-            key={system.id}
             type="button"
-            className={`system-card ${activeSystem === system.id ? "active" : ""}`}
-            onClick={() => setActiveSystem(system.id)}
+            className="flip-camera"
+            onClick={() =>
+              setFacingMode((current) => (current === "user" ? "environment" : "user"))
+            }
           >
-            <span className="system-eyebrow">{system.eyebrow}</span>
-            <strong>{system.label}</strong>
-            <span className="system-badge">{system.badge}</span>
-            <p>{system.summary}</p>
+            <FlipIcon />
+            Flip Camera
           </button>
-        ))}
+        </div>
+
+        <div className="live-toolbar">
+          <div className="gender-inline">
+            <span>Backend engine:</span>
+            <strong>Original live 2D try-on</strong>
+          </div>
+
+          <button
+            type="button"
+            className="secondary-pill"
+            onClick={() => refreshLiveFrame()}
+            disabled={!cameraReady || isRefreshing}
+          >
+            <RefreshIcon />
+            Refresh Live Frame
+          </button>
+        </div>
       </section>
 
-      <section className="panel subsystem-header">
-        <p className="eyebrow">{selectedSystem.eyebrow}</p>
-        <h2>{selectedSystem.label}</h2>
-        <p className="muted">{selectedSystem.summary}</p>
-        <p className="status-pill subtle-pill">Mounted backend path: {subsystemBasePath}</p>
-        {assetBankSummary && (
-          <p className="status-pill">
-            Active asset bank: {assetBankSummary.asset_count} reviewed hairstyle assets
-          </p>
-        )}
-      </section>
-
-      {supportsSharedStaticFlow ? (
-        <>
-          <section className="workspace">
-            <div className="panel upload-panel">
-              <label className="file-drop">
-                <span>Choose a face image</span>
-                <input
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  onChange={(event) => handleFileChange(event.target.files?.[0] ?? null)}
-                />
-              </label>
-              <label className="select-field">
-                <span>Recommendation gender</span>
-                <select value={targetGender} onChange={(event) => setTargetGender(event.target.value)}>
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                  <option value="any">Any</option>
-                </select>
-              </label>
-              {previewUrl && <img className="preview" src={previewUrl} alt="Uploaded preview" />}
-              <button disabled={!imageFile || isBusy} onClick={runAnalysis}>
-                {isBusy ? "Working..." : "Analyze and recommend"}
-              </button>
-              {error && <p className="error">{error}</p>}
-            </div>
-
-            <div className="panel">
-              <h2>Face analysis</h2>
-              {analysis?.face_attributes ? (
-                <div className="metric-grid">
-                  {Object.entries(analysis.face_attributes).map(([key, value]) => (
-                    <div key={key} className="metric">
-                      <span>{key.replace("_", " ")}</span>
-                      <strong>{value}</strong>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="muted">Analysis appears after upload.</p>
-              )}
-            </div>
-          </section>
-
-          <section className="recommendations">
-            <div className="section-heading">
-              <h2>Recommended assets</h2>
-              <p>Ready for automatic static 2D generation.</p>
-            </div>
-            <div className="cards">
-              {recommendations.map((item) => (
-                <article
-                  key={item.asset_id}
-                  className={`card ${selectedAssetId === item.asset_id ? "selected" : ""}`}
-                  onClick={() => setSelectedAssetId(item.asset_id)}
-                >
-                  {item.image_url && (
-                    <img src={resolveMediaUrl(item.image_url)} alt={`Hair asset ${item.asset_id}`} />
-                  )}
-                  <div>
-                    <strong>{item.asset_id}</strong>
-                    <span>{Math.round(item.score * 100)}% match</span>
-                  </div>
-                  <p>{item.reason}</p>
-                  <small>
-                    {item.gender_suitability ?? "neutral"} recommendation / {item.normalized_attributes.length} /{" "}
-                    {item.normalized_attributes.curl} /{" "}
-                    {item.normalized_attributes.style_family.replace("_", " ")}
-                  </small>
-                  <button onClick={() => runTryOn(item.asset_id)} disabled={isBusy}>
-                    {step === "tryon" && selectedAssetId === item.asset_id
-                      ? "Generating..."
-                      : "Try this"}
-                  </button>
-                </article>
-              ))}
-            </div>
-          </section>
-
-          <section ref={resultRef} className="result panel">
-            <h2>Try-on result</h2>
-            {step === "tryon" ? (
-                <p className="muted">Generating try-on preview...</p>
-              ) : tryOn?.output_image_url ? (
-                <>
-                  <p className="muted">{tryOn.message}</p>
-                  <img src={resolveMediaUrl(tryOn.output_image_url)} alt="Generated try-on result" />
-                  {tryOn.segmentation_mask_url && (
-                    <div className="result-meta">
-                      <p className="muted">Segmentation-guided placement is active for this result.</p>
-                      <img
-                        className="preview"
-                        src={resolveMediaUrl(tryOn.segmentation_mask_url)}
-                        alt="Predicted hair mask"
-                      />
-                    </div>
-                  )}
-                </>
-              ) : error ? (
-                <p className="error">{error}</p>
-              ) : (
-                <p className="muted">Select a recommendation and generate the overlay.</p>
-              )}
-          </section>
-        </>
-      ) : activeSystem === "generative" ? (
-        <PlaceholderPanel
-          title="Generative Try-On Backend"
-          body="The generative subsystem is now separated in backend routing and still uses the dedicated experimental package-building and notebook flow you created. The frontend home page exposes it as a distinct option without changing that logic."
-          note="Use the separate generative notebook and mounted backend under /api/generative for current experiments."
-        />
-      ) : activeSystem === "live2d" ? (
-        <PlaceholderPanel
-          title="Live 2D Demo Engine"
-          body="This subsystem now keeps the live webcam loop from the demo, but uses the project's own recommendation system, segmentation model, and static try-on asset bank."
-          note="Use the dedicated live_2d webcam runner or inspect /api/live-2d/info for project-runtime readiness."
-        />
-      ) : (
-        <PlaceholderPanel
-          title="Live 3D Try-On"
-          body="This subsystem has an isolated backend slot and is intentionally empty for now."
-          note="Reserved for future live 3D implementation."
-        />
-      )}
-    </main>
+      <RecommendationGrid
+        title="Recommended Hairstyles"
+        subtitle="Tap a hairstyle to preview it live on you"
+        recommendations={recommendations}
+        selectedAssetId={selectedAssetId}
+        onSelect={(item) => {
+          setSelectedAssetId(item.asset_id);
+          selectedAssetRef.current = item.asset_id;
+          if (cameraReady && !isRefreshing) {
+            refreshLiveFrame(item.asset_id);
+          }
+        }}
+        compact
+        mediaBasePath={SYSTEM_BASE_PATHS.live2d}
+        footer="Hairstyles are previewed in real-time. Your data is not stored."
+      />
+    </section>
   );
 }
+
+function App() {
+  const [currentView, setCurrentView] = useState("home");
+
+  function openSystem(systemId) {
+    if (systemId === "static") {
+      setCurrentView("static");
+    } else if (systemId === "generative") {
+      setCurrentView("generative");
+    } else if (systemId === "live2d") {
+      setCurrentView("live2d");
+    }
+  }
+
+  return (
+    <div className="app-shell">
+      <SceneBackdrop />
+      <TopNavigation currentView={currentView} onNavigate={setCurrentView} />
+
+      {currentView === "home" ? (
+        <HomeScreen onOpenSystem={openSystem} />
+      ) : null}
+
+      {currentView === "about" ? (
+        <InfoScreen
+          title="About Us"
+          text="This project combines recommendation, segmentation, rendering, and live experimentation in one hairstyle try-on platform."
+          items={ABOUT_POINTS}
+        />
+      ) : null}
+
+      {currentView === "contact" ? (
+        <InfoScreen
+          title="Contact Us"
+          text="Use the repository and local backend gateway as the main entry points for this project."
+          items={CONTACT_POINTS}
+        />
+      ) : null}
+
+      {currentView === "static" ? <StaticTryOnScreen /> : null}
+      {currentView === "generative" ? <GenerativeTryOnScreen /> : null}
+      {currentView === "live2d" ? <Live2DTryOnScreen /> : null}
+    </div>
+  );
+}
+
+export default App;
