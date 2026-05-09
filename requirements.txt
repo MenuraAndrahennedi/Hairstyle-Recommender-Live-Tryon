@@ -1,16 +1,27 @@
-fastapi
-uvicorn
-mediapipe
-pillow
-opencv-python
-numpy
-pandas
-matplotlib
-scikit-learn
-torch
-torchvision
-diffusers
-transformers
-accelerate
-safetensors
-sentencepiece
+# Backend API
+fastapi==0.136.1
+uvicorn[standard]==0.46.0
+pydantic==2.13.3
+python-multipart==0.0.27
+
+# Core image and CV stack
+mediapipe==0.10.33
+pillow==12.1.1
+opencv-python==4.13.0.92
+numpy==2.4.3
+
+# Data and notebook workflows
+pandas==3.0.2
+matplotlib==3.10.9
+scikit-learn==1.8.0
+
+# ML runtime
+torch==2.11.0
+torchvision==0.26.0
+
+# Generative try-on pipeline
+diffusers==0.38.0
+transformers==5.8.0
+accelerate==1.13.0
+safetensors>=0.8,<0.9
+sentencepiece==0.2.1

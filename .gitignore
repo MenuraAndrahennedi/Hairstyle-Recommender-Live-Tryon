@@ -54,7 +54,7 @@ checkpoints/
 backend/data/datasets
 backend/data/raw
 outputs/
-models/
+
 
 
 # Logs and temporary files

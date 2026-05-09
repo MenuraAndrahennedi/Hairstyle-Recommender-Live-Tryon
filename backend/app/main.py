@@ -53,7 +53,7 @@ def systems_catalog() -> dict[str, list[dict[str, str]]]:
                 "id": "live-2d",
                 "name": "Live 2D Try-On",
                 "mount_path": "/api/live-2d",
-                "status": "empty",
+                "status": "project_ready",
             },
             {
                 "id": "live-3d",
