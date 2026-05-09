@@ -810,6 +810,149 @@ button:disabled {
   gap: 1rem;
 }
 
+.live-wide-card {
+  width: min(1240px, 100%);
+}
+
+.live-2d-layout {
+  display: grid;
+  grid-template-columns: 240px minmax(420px, 1fr) 280px;
+  gap: 1rem;
+  align-items: stretch;
+}
+
+.live-side-panel,
+.live-main-panel {
+  min-width: 0;
+}
+
+.live-instruction-card,
+.live-recommend-card,
+.live-details-card {
+  padding: 1rem;
+  border-radius: 1.4rem;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: var(--shadow-soft);
+}
+
+.live-instruction-card h3,
+.live-recommend-card h3 {
+  margin: 0 0 0.9rem;
+  color: var(--ink);
+}
+
+.live-instruction-list {
+  display: grid;
+  gap: 0.7rem;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.live-instruction-list p {
+  margin: 0;
+  line-height: 1.45;
+}
+
+.live-mini-grid {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.live-mini-card {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  width: 100%;
+  padding: 0.6rem;
+  border-radius: 1rem;
+  color: var(--ink);
+  background: rgba(245, 247, 255, 0.82);
+  border: 1px solid rgba(150, 160, 255, 0.14);
+  text-align: left;
+}
+
+.live-mini-card.active {
+  border-color: rgba(113, 88, 255, 0.55);
+  box-shadow:
+    0 0 0 1px rgba(113, 88, 255, 0.2),
+    var(--shadow-soft);
+}
+
+.live-mini-card img {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 0.8rem;
+  background: rgba(255, 255, 255, 0.75);
+}
+
+.live-mini-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.live-mini-meta strong {
+  font-size: 0.95rem;
+}
+
+.live-mini-meta small {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.live-details-card {
+  width: min(1240px, 100%);
+  margin: 1rem auto 0;
+}
+
+.live-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+.live-stat-box {
+  padding: 0.85rem;
+  border-radius: 1rem;
+  background: rgba(245, 247, 255, 0.82);
+  border: 1px solid rgba(150, 160, 255, 0.12);
+}
+
+.live-stat-box span {
+  display: block;
+  margin-bottom: 0.25rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.live-stat-box strong {
+  color: var(--ink);
+  font-size: 1rem;
+  word-break: break-word;
+}
+
+.live-reason {
+  margin-top: 1rem;
+}
+
+@media (max-width: 1100px) {
+  .live-2d-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .live-stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .live-stats-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .stage-topbar {
   margin-bottom: 0.9rem;
 }

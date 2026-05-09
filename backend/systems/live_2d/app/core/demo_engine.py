@@ -329,6 +329,19 @@ class Live2DDemoEngine:
             "image_width": self.current_face_analysis.image_width if self.current_face_analysis else None,
             "image_height": self.current_face_analysis.image_height if self.current_face_analysis else None,
             "selected_asset_id": selected_asset.asset_id if selected_asset is not None else None,
+            "selected_score": (
+                float(self.current_recommendations[self.selected_index].score)
+                if self.current_recommendations
+                else 0.0
+            ),
+            "top_picks": len(self.current_recommendations),
+            "clean_bank": len(live_candidate_assets()),
+            "tuning": {
+                "x": self.tuning.x_offset,
+                "y": self.tuning.y_offset,
+                "scale": round(self.tuning.scale, 2),
+                "rotation": self.tuning.rotation,
+            },
             "recommendations": recommendations,
         }
 

@@ -1020,6 +1020,7 @@ function Live2DTryOnScreen() {
   const [cameraReady, setCameraReady] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [recommendations, setRecommendations] = useState([]);
+  const [liveStats, setLiveStats] = useState(null);
   const [selectedAssetId, setSelectedAssetId] = useState("");
   const [facingMode, setFacingMode] = useState("user");
   const [processedFrameUrl, setProcessedFrameUrl] = useState("");
@@ -1312,6 +1313,18 @@ function Live2DTryOnScreen() {
           if (payload.type === "metadata") {
             setRecommendations(payload.recommendations ?? []);
 
+            setLiveStats({
+              selectedScore: payload.selected_score ?? 0,
+              topPicks: payload.top_picks ?? 0,
+              cleanBank: payload.clean_bank ?? 0,
+              tuning: payload.tuning ?? {
+                x: 0,
+                y: 0,
+                scale: 1,
+                rotation: 0,
+              },
+            });
+
             const nextSelected =
               payload.selected_asset_id ??
               payload.recommendations?.[0]?.asset_id ??
@@ -1376,6 +1389,11 @@ function Live2DTryOnScreen() {
     };
   }, [cameraReady, liveInfo?.status]);
 
+  const selectedRecommendation =
+    recommendations.find((item) => item.asset_id === selectedAssetId) ??
+    recommendations[0] ??
+    null;
+
   return (
     <section className="page live-page">
       <div className="page-head live-head">
@@ -1405,8 +1423,7 @@ function Live2DTryOnScreen() {
             : ""
         }
       />
-
-      <section className="glass-card live-stage-card">
+      <section className="glass-card live-stage-card live-wide-card">
         <div className="stage-topbar">
           <span className="live-chip">
             <span className={`live-dot ${wsConnected ? "on" : ""}`} />
@@ -1418,98 +1435,212 @@ function Live2DTryOnScreen() {
           </span>
         </div>
 
-        <div className="live-stage">
-          <video
-            ref={videoRef}
-            className="live-video live-video-source"
-            playsInline
-            muted
-          />
+        <div className="live-2d-layout">
+          <aside className="live-side-panel">
+            <div className="live-instruction-card">
+              <h3>Move Hair</h3>
+              <div className="live-instruction-list">
+                <p>
+                  <strong>Arrow keys</strong> or <strong>I/J/K/L</strong> — move
+                  hair
+                </p>
+                <p>
+                  <strong>W / S</strong> — increase / decrease size
+                </p>
+                <p>
+                  <strong>A / D</strong> — rotate left / right
+                </p>
+                <p>
+                  <strong>R</strong> — cycle hairstyle
+                </p>
+                <p>
+                  <strong>T</strong> — reset tuning
+                </p>
+              </div>
+            </div>
+          </aside>
+          <div className="live-main-panel">
+            <div className="live-stage">
+              <video
+                ref={videoRef}
+                className="live-video live-video-source"
+                playsInline
+                muted
+              />
 
-          {processedFrameUrl ? (
-            <img
-              src={processedFrameUrl}
-              alt="Live 2D backend output"
-              className="live-video"
-            />
-          ) : (
-            <div className="empty-panel">Waiting for backend live frame...</div>
-          )}
+              {processedFrameUrl ? (
+                <img
+                  src={processedFrameUrl}
+                  alt="Live 2D backend output"
+                  className="live-video"
+                />
+              ) : (
+                <div className="empty-panel">
+                  Waiting for backend live frame...
+                </div>
+              )}
 
-          <div className="live-stage-note">
-            <SparkleIcon />
-            <div>
-              <strong>
-                {cameraReady ? "Tracking your face" : "Waiting for camera"}
-              </strong>
-              <span>
-                {wsConnected
-                  ? "Streaming through WebSocket binary frames"
-                  : "Connecting to backend live stream"}
-              </span>
+              <button
+                type="button"
+                className="flip-camera"
+                onClick={() =>
+                  setFacingMode((current) =>
+                    current === "user" ? "environment" : "user",
+                  )
+                }
+              >
+                <FlipIcon />
+                Flip Camera
+              </button>
+            </div>
+
+            <div className="live-toolbar">
+              <div className="gender-inline">
+                <span>Backend engine:</span>
+                <strong>WebSocket live 2D try-on</strong>
+              </div>
+
+              <button
+                type="button"
+                className="secondary-pill"
+                onClick={() => sendLiveFrame()}
+                disabled={!cameraReady || !wsConnected || isRefreshing}
+              >
+                <RefreshIcon />
+                Refresh Live Frame
+              </button>
             </div>
           </div>
 
-          <button
-            type="button"
-            className="flip-camera"
-            onClick={() =>
-              setFacingMode((current) =>
-                current === "user" ? "environment" : "user",
-              )
-            }
-          >
-            <FlipIcon />
-            Flip Camera
-          </button>
-        </div>
+          <aside className="live-side-panel">
+            <div className="live-recommend-card">
+              <h3>Hairstyles</h3>
 
-        <div className="live-toolbar">
-          <div className="gender-inline">
-            <span>Backend engine:</span>
-            <strong>WebSocket live 2D try-on</strong>
-          </div>
+              <div className="live-mini-grid">
+                {recommendations.map((item) => (
+                  <button
+                    key={item.asset_id}
+                    type="button"
+                    className={`live-mini-card ${
+                      selectedAssetId === item.asset_id ? "active" : ""
+                    }`}
+                    onClick={() => {
+                      setSelectedAssetId(item.asset_id);
+                      selectedAssetRef.current = item.asset_id;
 
-          <button
-            type="button"
-            className="secondary-pill"
-            onClick={() => sendLiveFrame()}
-            disabled={!cameraReady || !wsConnected || isRefreshing}
-          >
-            <RefreshIcon />
-            Refresh Live Frame
-          </button>
+                      const socket = socketRef.current;
+
+                      if (socket && socket.readyState === WebSocket.OPEN) {
+                        socket.send(
+                          JSON.stringify({
+                            type: "control",
+                            selected_asset_id: item.asset_id,
+                          }),
+                        );
+                      }
+
+                      if (cameraReady && wsConnected) {
+                        sendLiveFrame(item.asset_id);
+                      }
+                    }}
+                  >
+                    {item.image_url ? (
+                      <img
+                        src={resolveMediaUrl(
+                          item.image_url,
+                          SYSTEM_BASE_PATHS.live2d,
+                        )}
+                        alt={item.asset_id}
+                      />
+                    ) : null}
+
+                    <span className="live-mini-meta">
+                      <strong>
+                        {formatAssetName(
+                          item.asset_id,
+                          item.normalized_attributes,
+                        )}
+                      </strong>
+                      <small>
+                        {Math.round((item.score ?? 0) * 100)}% match
+                      </small>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </aside>
         </div>
       </section>
 
-      <RecommendationGrid
-        title="Recommended Hairstyles"
-        subtitle="Tap a hairstyle to preview it live on you"
-        recommendations={recommendations}
-        selectedAssetId={selectedAssetId}
-        onSelect={(item) => {
-          setSelectedAssetId(item.asset_id);
-          selectedAssetRef.current = item.asset_id;
+      <section className="glass-card live-details-card">
+        <div className="section-title">
+          <div className="section-icon pink-icon">
+            <SparkleIcon />
+          </div>
+          <div>
+            <h2>Selected Hair Match Details</h2>
+            <p>
+              Recommendation and manual tuning details are shown here instead of
+              on the camera window.
+            </p>
+          </div>
+        </div>
 
-          const socket = socketRef.current;
+        <div className="live-stats-grid">
+          <div className="live-stat-box">
+            <span>Selected hairstyle</span>
+            <strong>{selectedRecommendation?.asset_id ?? "None"}</strong>
+          </div>
 
-          if (socket && socket.readyState === WebSocket.OPEN) {
-            socket.send(
-              JSON.stringify({
-                type: "control",
-                selected_asset_id: item.asset_id,
-              }),
-            );
-          }
+          <div className="live-stat-box">
+            <span>Recommendation score</span>
+            <strong>
+              {Math.round((liveStats?.selectedScore ?? 0) * 100)}%
+            </strong>
+          </div>
 
-          if (cameraReady && wsConnected) {
-            sendLiveFrame(item.asset_id);
-          }
-        }}
-        compact
-        mediaBasePath={SYSTEM_BASE_PATHS.live2d}
-        footer="Hairstyles are previewed through backend WebSocket streaming. Your data is not stored."
-      />
+          <div className="live-stat-box">
+            <span>Top picks</span>
+            <strong>{liveStats?.topPicks ?? recommendations.length}</strong>
+          </div>
+
+          <div className="live-stat-box">
+            <span>Clean bank</span>
+            <strong>
+              {liveStats?.cleanBank ??
+                liveInfo?.readiness?.tryon_clean_candidate_count ??
+                0}
+            </strong>
+          </div>
+
+          <div className="live-stat-box">
+            <span>X offset</span>
+            <strong>{liveStats?.tuning?.x ?? 0}</strong>
+          </div>
+
+          <div className="live-stat-box">
+            <span>Y offset</span>
+            <strong>{liveStats?.tuning?.y ?? 0}</strong>
+          </div>
+
+          <div className="live-stat-box">
+            <span>Scale</span>
+            <strong>{liveStats?.tuning?.scale ?? 1}</strong>
+          </div>
+
+          <div className="live-stat-box">
+            <span>Rotation</span>
+            <strong>{liveStats?.tuning?.rotation ?? 0}</strong>
+          </div>
+        </div>
+
+        {selectedRecommendation?.reason ? (
+          <p className="panel-footer live-reason">
+            <strong>Reason:</strong> {selectedRecommendation.reason}
+          </p>
+        ) : null}
+      </section>
     </section>
   );
 }
