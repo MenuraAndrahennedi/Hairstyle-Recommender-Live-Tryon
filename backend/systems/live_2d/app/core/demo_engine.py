@@ -36,8 +36,8 @@ from systems.static_auto_tryon.auto_app.models.schemas import (
 CLASSIFIER_SIZE = 128
 SEGMENTATION_SIZE = 64
 
-HAIR_WIDTH_SCALE = 1.55
-HAIR_Y_OFFSET = 0.65
+HAIR_WIDTH_SCALE = 1.40
+HAIR_Y_OFFSET = 0.58
 ROTATION_STRENGTH = 0.4
 
 SMOOTHING = 0.75
@@ -46,6 +46,7 @@ ANGLE_SMOOTHING = 0.80
 MASK_BLUR = 45
 PREDICTION_INTERVAL = 3.0
 MASK_INTERVAL = 1.
+OVERLAY_CANVAS_PADDING = 300
 
 TRYON_CLEAN_ROOT = FULL_HAIR_ASSET_ROOT / "tryon_clean"
 TRYON_CLEAN_IMAGE_DIR = TRYON_CLEAN_ROOT / "images"
@@ -132,9 +133,21 @@ class Live2DDemoEngine:
         self.selected_index = 0
         self.current_mask: Image.Image | None = None
         self.current_mask_array: Any = None
+        self.target_gender = "any"
 
         self.last_prediction_time = 0.0
         self.last_mask_time = 0.0
+
+    def set_target_gender(self, target_gender: str | None) -> None:
+        normalized = (target_gender or "any").strip().lower()
+        if normalized not in {"any", "male", "female"}:
+            normalized = "any"
+        if normalized != self.target_gender:
+            self.target_gender = normalized
+            self.current_recommendations = []
+            self.selected_index = 0
+            self.last_prediction_time = 0.0
+            self.reset_smoothing()
 
     def close(self) -> None:
         self.face_landmarker.close()
@@ -184,6 +197,37 @@ class Live2DDemoEngine:
         blurred = self.cv2.GaussianBlur(frame, (45, 45), 0)
         suppressed = (blurred * 0.20).astype(self.np.uint8)
         return (mask_3 * suppressed + (1 - mask_3) * frame).astype(self.np.uint8)
+
+    def overlay_hair_on_extended_canvas(
+        self,
+        frame: Any,
+        hair_rgb: Any,
+        hair_alpha: Any,
+        x1: float,
+        y1: float,
+    ) -> Any:
+        pad = OVERLAY_CANVAS_PADDING
+
+        extended = self.cv2.copyMakeBorder(
+            frame,
+            pad,
+            pad,
+            pad,
+            pad,
+            self.cv2.BORDER_CONSTANT,
+            value=(255, 255, 255),
+        )
+
+        extended = self.overlay_hair(
+            extended,
+            hair_rgb,
+            hair_alpha,
+            x1 + pad,
+            y1 + pad,
+        )
+
+        height, width = frame.shape[:2]
+        return extended[pad : pad + height, pad : pad + width]
 
     def overlay_hair(self, frame: Any, hair_rgb: Any, hair_alpha: Any, x1: float, y1: float) -> Any:
         height, width = frame.shape[:2]
@@ -295,7 +339,7 @@ class Live2DDemoEngine:
         face_attributes = FaceAttributes.model_validate(face_analysis.face_attributes)
         response = recommend_hairstyles(
             face_attributes,
-            preferences=RecommendationPreferences(target_gender="any", allow_bangs=True),
+            preferences=RecommendationPreferences(target_gender=self.target_gender, allow_bangs=True),
             top_k=3,
             candidate_assets=live_candidate_assets(),
         )
@@ -350,6 +394,7 @@ class Live2DDemoEngine:
             "image_width": self.current_face_analysis.image_width if self.current_face_analysis else None,
             "image_height": self.current_face_analysis.image_height if self.current_face_analysis else None,
             "selected_asset_id": selected_asset.asset_id if selected_asset is not None else None,
+            "target_gender": self.target_gender,
             "selected_score": (
                 float(self.current_recommendations[self.selected_index].score)
                 if self.current_recommendations
@@ -440,7 +485,7 @@ class Live2DDemoEngine:
                 center_x = int((x_min + x_max) / 2)
 
                 # Estimate full head width instead of only face width
-                head_width = face_width * 1.45
+                head_width = face_width * 1.15
 
                 # Preserve large-volume hairstyles
                 target_width = int(
@@ -474,7 +519,7 @@ class Live2DDemoEngine:
                 self.smooth_x1 = self.smooth_value(self.smooth_x1, raw_x1, SMOOTHING)
                 self.smooth_y1 = self.smooth_value(self.smooth_y1, raw_y1, SMOOTHING)
 
-                frame = self.overlay_hair(
+                frame = self.overlay_hair_on_extended_canvas(
                     frame,
                     rotated_rgb,
                     rotated_alpha,

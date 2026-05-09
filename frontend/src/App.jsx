@@ -330,6 +330,34 @@ function GenderToggle({ value, onChange }) {
   );
 }
 
+function LiveGenderToggle({ value, onChange }) {
+  return (
+    <div className="gender-toggle gender-toggle-triple">
+      <button
+        type="button"
+        className={value === "any" ? "active" : ""}
+        onClick={() => onChange("any")}
+      >
+        Any
+      </button>
+      <button
+        type="button"
+        className={value === "male" ? "active" : ""}
+        onClick={() => onChange("male")}
+      >
+        Male
+      </button>
+      <button
+        type="button"
+        className={value === "female" ? "active" : ""}
+        onClick={() => onChange("female")}
+      >
+        Female
+      </button>
+    </div>
+  );
+}
+
 function UploadCard({
   title,
   subtitle,
@@ -1010,6 +1038,7 @@ function Live2DTryOnScreen() {
   const streamRef = useRef(null);
   const socketRef = useRef(null);
   const selectedAssetRef = useRef("");
+  const targetGenderRef = useRef("any");
   const pendingFrameRef = useRef(false);
   const latestFrameUrlRef = useRef("");
   const sendLoopTimerRef = useRef(null);
@@ -1022,6 +1051,7 @@ function Live2DTryOnScreen() {
   const [recommendations, setRecommendations] = useState([]);
   const [liveStats, setLiveStats] = useState(null);
   const [selectedAssetId, setSelectedAssetId] = useState("");
+  const [targetGender, setTargetGender] = useState("any");
   const [facingMode, setFacingMode] = useState("user");
   const [processedFrameUrl, setProcessedFrameUrl] = useState("");
   const [wsConnected, setWsConnected] = useState(false);
@@ -1118,6 +1148,10 @@ function Live2DTryOnScreen() {
   }, [selectedAssetId]);
 
   useEffect(() => {
+    targetGenderRef.current = targetGender;
+  }, [targetGender]);
+
+  useEffect(() => {
     return () => {
       if (latestFrameUrlRef.current) {
         URL.revokeObjectURL(latestFrameUrlRef.current);
@@ -1176,6 +1210,7 @@ function Live2DTryOnScreen() {
         type: "control",
         action,
         selected_asset_id: selectedAssetRef.current || "",
+        target_gender: targetGenderRef.current || "any",
       }),
     );
 
@@ -1202,6 +1237,7 @@ function Live2DTryOnScreen() {
         JSON.stringify({
           type: "control",
           selected_asset_id: nextSelectedAssetId || "",
+          target_gender: targetGenderRef.current || "any",
         }),
       );
 
@@ -1290,6 +1326,7 @@ function Live2DTryOnScreen() {
         JSON.stringify({
           type: "control",
           selected_asset_id: selectedAssetRef.current || "",
+          target_gender: targetGenderRef.current || "any",
         }),
       );
 
@@ -1439,6 +1476,7 @@ function Live2DTryOnScreen() {
           <aside className="live-side-panel">
             <div className="live-instruction-card">
               <h3>Move Hair</h3>
+
               <div className="live-instruction-list">
                 <p>
                   <strong>Arrow keys</strong> or <strong>I/J/K/L</strong> — move
@@ -1498,6 +1536,14 @@ function Live2DTryOnScreen() {
               <div className="gender-inline">
                 <span>Backend engine:</span>
                 <strong>WebSocket live 2D try-on</strong>
+                <span>Filter:</span>
+                <strong>
+                  {targetGender === "any"
+                    ? "Any"
+                    : targetGender === "male"
+                      ? "Male"
+                      : "Female"}
+                </strong>
               </div>
 
               <button
@@ -1535,6 +1581,7 @@ function Live2DTryOnScreen() {
                           JSON.stringify({
                             type: "control",
                             selected_asset_id: item.asset_id,
+                            target_gender: targetGenderRef.current || "any",
                           }),
                         );
                       }
@@ -1567,6 +1614,35 @@ function Live2DTryOnScreen() {
                     </span>
                   </button>
                 ))}
+              </div>
+              <div className="live-gender-filter">
+                <h4>Recommendation Filter</h4>
+
+                <div className="gender-toggle">
+                  <button
+                    type="button"
+                    className={targetGender === "any" ? "active" : ""}
+                    onClick={() => setTargetGender("any")}
+                  >
+                    Any
+                  </button>
+
+                  <button
+                    type="button"
+                    className={targetGender === "male" ? "active" : ""}
+                    onClick={() => setTargetGender("male")}
+                  >
+                    Male
+                  </button>
+
+                  <button
+                    type="button"
+                    className={targetGender === "female" ? "active" : ""}
+                    onClick={() => setTargetGender("female")}
+                  >
+                    Female
+                  </button>
+                </div>
               </div>
             </div>
           </aside>

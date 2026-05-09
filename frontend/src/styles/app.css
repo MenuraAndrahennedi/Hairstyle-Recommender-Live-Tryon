@@ -628,6 +628,10 @@ button:disabled {
   gap: 0.7rem;
 }
 
+.gender-toggle-triple {
+  grid-template-columns: repeat(3, 1fr);
+}
+
 .gender-toggle button {
   display: inline-flex;
   align-items: center;
@@ -841,6 +845,10 @@ button:disabled {
   color: var(--ink);
 }
 
+.live-gender-filter {
+  margin-bottom: 1rem;
+}
+
 .live-instruction-list {
   display: grid;
   gap: 0.7rem;
@@ -998,7 +1006,8 @@ button:disabled {
   width: 100%;
   height: 100%;
   min-height: 15rem;
-  object-fit: cover;
+  object-fit: contain;
+  background: rgba(255, 255, 255, 0.65);
 }
 
 .live-video-source {
@@ -1007,6 +1016,17 @@ button:disabled {
   opacity: 0;
   pointer-events: none;
   transform: scaleX(-1);
+}
+
+.live-gender-filter {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(150, 160, 255, 0.16);
+}
+
+.live-gender-filter h4 {
+  margin: 0 0 0.7rem;
+  color: var(--ink);
 }
 
 .live-overlay {

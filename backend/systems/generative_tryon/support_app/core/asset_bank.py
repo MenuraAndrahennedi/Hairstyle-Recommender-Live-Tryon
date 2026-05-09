@@ -374,23 +374,23 @@ def load_reviewed_asset_bank() -> List[AssetMetadata]:
 
 
 def load_asset_bank() -> List[AssetMetadata]:
-    """Runtime recommendation bank: prefer the full CelebA full-hair asset bank."""
-    full_hair_assets = load_full_hair_asset_bank()
-    if full_hair_assets:
-        return full_hair_assets
-
+    """Runtime recommendation bank: prefer the reviewed render-safe asset bank."""
     reviewed_render_safe_assets = load_reviewed_render_safe_asset_bank()
     if reviewed_render_safe_assets:
         return reviewed_render_safe_assets
+
+    full_hair_assets = load_full_hair_asset_bank()
+    if full_hair_assets:
+        return full_hair_assets
     return load_reviewed_asset_bank()
 
 
 def asset_bank_summary() -> dict:
     assets = load_asset_bank()
-    if FULL_HAIR_ASSET_METADATA_DIR.exists() and load_full_hair_asset_bank():
-        metadata_dir = str(FULL_HAIR_ASSET_METADATA_DIR)
-    elif REVIEWED_RENDER_SAFE_ASSET_BANK_JSONL.exists() and load_reviewed_render_safe_asset_bank():
+    if REVIEWED_RENDER_SAFE_ASSET_BANK_JSONL.exists() and load_reviewed_render_safe_asset_bank():
         metadata_dir = str(REVIEWED_RENDER_SAFE_ASSET_BANK_JSONL)
+    elif FULL_HAIR_ASSET_METADATA_DIR.exists() and load_full_hair_asset_bank():
+        metadata_dir = str(FULL_HAIR_ASSET_METADATA_DIR)
     else:
         metadata_dir = str(REVIEWED_ASSET_BANK_JSONL)
     return {
