@@ -37,7 +37,7 @@ CLASSIFIER_SIZE = 128
 SEGMENTATION_SIZE = 64
 
 HAIR_WIDTH_SCALE = 1.55
-HAIR_Y_OFFSET = 0.55
+HAIR_Y_OFFSET = 0.65
 ROTATION_STRENGTH = 0.4
 
 SMOOTHING = 0.75
@@ -72,7 +72,7 @@ class ManualTuning:
 def live_candidate_assets() -> list[AssetMetadata]:
     candidates: list[AssetMetadata] = []
     for asset in load_asset_bank():
-        image_path, mask_path = tryon_clean_paths(asset)
+        image_path, mask_path = renderable_asset_paths(asset)
         if image_path.exists() and mask_path.exists():
             candidates.append(asset)
     return candidates
@@ -82,6 +82,27 @@ def tryon_clean_paths(asset: AssetMetadata) -> tuple[Path, Path]:
     image_name = Path(asset.image_path).name
     mask_name = Path(asset.mask_path).name
     return TRYON_CLEAN_IMAGE_DIR / image_name, TRYON_CLEAN_MASK_DIR / mask_name
+
+
+def full_asset_paths(asset: AssetMetadata) -> tuple[Path, Path]:
+    processed_image_path = Path(asset.image_path)
+    processed_mask_path = Path(asset.mask_path)
+    if processed_image_path.exists() and processed_mask_path.exists():
+        return processed_image_path, processed_mask_path
+
+    raw_image_path = Path(asset.raw_image_path)
+    raw_mask_path = Path(asset.raw_label_path)
+    if raw_image_path.exists() and raw_mask_path.exists():
+        return raw_image_path, raw_mask_path
+
+    return processed_image_path, processed_mask_path
+
+
+def renderable_asset_paths(asset: AssetMetadata) -> tuple[Path, Path]:
+    clean_image_path, clean_mask_path = tryon_clean_paths(asset)
+    if clean_image_path.exists() and clean_mask_path.exists():
+        return clean_image_path, clean_mask_path
+    return full_asset_paths(asset)
 
 
 class Live2DDemoEngine:
@@ -346,7 +367,7 @@ class Live2DDemoEngine:
         }
 
     def load_project_hair_asset(self, asset: AssetMetadata) -> tuple[Any | None, Any | None]:
-        image_path, mask_path = tryon_clean_paths(asset)
+        image_path, mask_path = renderable_asset_paths(asset)
         if not image_path.exists() or not mask_path.exists():
             return None, None
 
@@ -418,8 +439,18 @@ class Live2DDemoEngine:
                 forehead_y = int((landmarks[10].y + landmarks[151].y) / 2 * height)
                 center_x = int((x_min + x_max) / 2)
 
-                target_width = int(face_width * HAIR_WIDTH_SCALE * self.tuning.scale)
+                # Estimate full head width instead of only face width
+                head_width = face_width * 1.45
+
+                # Preserve large-volume hairstyles
+                target_width = int(
+                    head_width *
+                    HAIR_WIDTH_SCALE *
+                    self.tuning.scale
+                )
+
                 scale = target_width / max(hair_rgb.shape[1], 1)
+
                 new_width = max(int(hair_rgb.shape[1] * scale), 1)
                 new_height = max(int(hair_rgb.shape[0] * scale), 1)
 
