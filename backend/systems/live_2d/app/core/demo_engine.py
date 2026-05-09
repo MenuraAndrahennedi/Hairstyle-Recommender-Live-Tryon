@@ -45,7 +45,7 @@ ANGLE_SMOOTHING = 0.80
 
 MASK_BLUR = 45
 PREDICTION_INTERVAL = 3.0
-MASK_INTERVAL = 1.5
+MASK_INTERVAL = 1.
 
 TRYON_CLEAN_ROOT = FULL_HAIR_ASSET_ROOT / "tryon_clean"
 TRYON_CLEAN_IMAGE_DIR = TRYON_CLEAN_ROOT / "images"
@@ -86,6 +86,7 @@ def tryon_clean_paths(asset: AssetMetadata) -> tuple[Path, Path]:
 
 class Live2DDemoEngine:
     def __init__(self) -> None:
+        self.show_hud = True
         self.cv2, self.mp, self.np = _lazy_imports()
 
         base_options = self.mp.tasks.BaseOptions
@@ -437,7 +438,8 @@ class Live2DDemoEngine:
                     self.smooth_y1,
                 )
 
-        self.draw_hud(frame)
+        if self.show_hud:
+            frame = self.draw_hud(frame)
         return frame
 
     def draw_empty_hud(self, frame: Any) -> None:
