@@ -3,14 +3,12 @@
   "missing_predictions": 0,
   "review_length_counts": {
     "long": 57,
-    "short": 51,
-    "medium": 9,
-    "(blank)": 3
+    "short": 54,
+    "medium": 9
   },
   "review_curl_counts": {
-    "straight": 45,
-    "wavy": 39,
-    "(blank)": 34,
+    "wavy": 47,
+    "straight": 71,
     "curly": 2
   },
   "pred_length_counts": {

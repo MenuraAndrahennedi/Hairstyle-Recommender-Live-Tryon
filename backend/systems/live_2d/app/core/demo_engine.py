@@ -36,8 +36,8 @@ from systems.static_auto_tryon.auto_app.models.schemas import (
 CLASSIFIER_SIZE = 128
 SEGMENTATION_SIZE = 64
 
-HAIR_WIDTH_SCALE = 1.9
-HAIR_Y_OFFSET = 0.35
+HAIR_WIDTH_SCALE = 1.55
+HAIR_Y_OFFSET = 0.55
 ROTATION_STRENGTH = 0.4
 
 SMOOTHING = 0.75
@@ -501,35 +501,61 @@ class Live2DDemoEngine:
         )
 
     def handle_key(self, key: int) -> bool:
-        if key == ord("q"):
-            return False
-        if key == 81:
+        # Windows OpenCV arrow key codes
+        LEFT_KEYS = {81, 2424832, 65361}
+        RIGHT_KEYS = {83, 2555904, 65363}
+        UP_KEYS = {82, 2490368, 65362}
+        DOWN_KEYS = {84, 2621440, 65364}
+
+        # Arrow keys
+        if key in LEFT_KEYS:
             self.tuning.x_offset -= 5
-        elif key == 83:
+        elif key in RIGHT_KEYS:
             self.tuning.x_offset += 5
-        elif key == 82:
+        elif key in UP_KEYS:
             self.tuning.y_offset -= 5
-        elif key == 84:
+        elif key in DOWN_KEYS:
             self.tuning.y_offset += 5
-        elif key == ord("w"):
-            self.tuning.scale += 0.05
-        elif key == ord("s"):
-            self.tuning.scale = max(0.3, self.tuning.scale - 0.05)
-        elif key == ord("a"):
-            self.tuning.rotation -= 3
-        elif key == ord("d"):
-            self.tuning.rotation += 3
-        elif key == ord("r") and self.current_recommendations:
-            self.selected_index = (self.selected_index + 1) % len(self.current_recommendations)
-            self.reset_smoothing()
-        elif key in (ord("1"), ord("2"), ord("3")) and self.current_recommendations:
-            requested_index = int(chr(key)) - 1
-            if requested_index < len(self.current_recommendations):
-                self.selected_index = requested_index
+
+        else:
+            k = key & 0xFF
+
+            if k == ord("q"):
+                return False
+
+            # Extra fallback movement keys
+            elif k == ord("j"):
+                self.tuning.x_offset -= 5
+            elif k == ord("l"):
+                self.tuning.x_offset += 5
+            elif k == ord("i"):
+                self.tuning.y_offset -= 5
+            elif k == ord("k"):
+                self.tuning.y_offset += 5
+
+            elif k == ord("w"):
+                self.tuning.scale += 0.05
+            elif k == ord("s"):
+                self.tuning.scale = max(0.3, self.tuning.scale - 0.05)
+
+            elif k == ord("a"):
+                self.tuning.rotation -= 3
+            elif k == ord("d"):
+                self.tuning.rotation += 3
+            elif k == ord("r") and self.current_recommendations:
+                self.selected_index = (self.selected_index + 1) % len(self.current_recommendations)
                 self.reset_smoothing()
-        elif key == ord("t"):
-            self.tuning = ManualTuning()
-            self.reset_smoothing()
+
+            elif k in (ord("1"), ord("2"), ord("3")) and self.current_recommendations:
+                requested_index = int(chr(k)) - 1
+                if requested_index < len(self.current_recommendations):
+                    self.selected_index = requested_index
+                    self.reset_smoothing()
+
+            elif k == ord("t"):
+                self.tuning = ManualTuning()
+                self.reset_smoothing()
+
         return True
 
     def run_webcam(self) -> None:
@@ -582,9 +608,13 @@ class Live2DDemoEngine:
                     break
                 frame = self.process_frame(frame)
                 self.cv2.imshow("Live 2D Try-On (Original Overlay Logic)", frame)
-                key = self.cv2.waitKey(1) & 0xFF
-                if not self.handle_key(key):
-                    break
+                key = self.cv2.waitKeyEx(1)
+                if key != -1:
+                    # Optional: print key codes for debugging
+                    # print("Pressed key:", key)
+
+                    if not self.handle_key(key):
+                        break
         finally:
             cap.release()
             self.cv2.destroyAllWindows()
