@@ -69,8 +69,10 @@ def info() -> dict[str, object]:
 async def process_live_frame(
     image: UploadFile = File(...),
     selected_asset_id: str | None = Form(default=None),
+    target_gender: str | None = Form(default=None),
 ) -> dict[str, object]:
     engine = get_engine()
+    engine.set_target_gender(target_gender)
     image_bytes = await image.read()
     if not image_bytes:
         raise HTTPException(
@@ -118,6 +120,7 @@ async def live_2d_websocket(websocket: WebSocket) -> None:
 
     engine = get_engine()
     selected_asset_id: str | None = None
+    target_gender: str | None = None
 
     try:
         while True:
@@ -133,6 +136,10 @@ async def live_2d_websocket(websocket: WebSocket) -> None:
                 next_asset_id = control.get("selected_asset_id")
                 if next_asset_id:
                     selected_asset_id = next_asset_id
+
+                next_target_gender = control.get("target_gender")
+                if next_target_gender is not None:
+                    target_gender = next_target_gender
 
                 action = control.get("action")
 
@@ -199,6 +206,7 @@ async def live_2d_websocket(websocket: WebSocket) -> None:
 
             with _ENGINE_LOCK:
                 engine.show_hud = False
+                engine.set_target_gender(target_gender)
 
                 if selected_asset_id and engine.current_recommendations:
                     engine.set_selected_asset_by_id(selected_asset_id)

@@ -36,8 +36,8 @@ from systems.static_auto_tryon.auto_app.models.schemas import (
 CLASSIFIER_SIZE = 128
 SEGMENTATION_SIZE = 64
 
-HAIR_WIDTH_SCALE = 1.55
-HAIR_Y_OFFSET = 0.55
+HAIR_WIDTH_SCALE = 1.40
+HAIR_Y_OFFSET = 0.58
 ROTATION_STRENGTH = 0.4
 
 SMOOTHING = 0.75
@@ -46,6 +46,7 @@ ANGLE_SMOOTHING = 0.80
 MASK_BLUR = 45
 PREDICTION_INTERVAL = 3.0
 MASK_INTERVAL = 1.
+OVERLAY_CANVAS_PADDING = 300
 
 TRYON_CLEAN_ROOT = FULL_HAIR_ASSET_ROOT / "tryon_clean"
 TRYON_CLEAN_IMAGE_DIR = TRYON_CLEAN_ROOT / "images"
@@ -72,7 +73,7 @@ class ManualTuning:
 def live_candidate_assets() -> list[AssetMetadata]:
     candidates: list[AssetMetadata] = []
     for asset in load_asset_bank():
-        image_path, mask_path = tryon_clean_paths(asset)
+        image_path, mask_path = renderable_asset_paths(asset)
         if image_path.exists() and mask_path.exists():
             candidates.append(asset)
     return candidates
@@ -82,6 +83,27 @@ def tryon_clean_paths(asset: AssetMetadata) -> tuple[Path, Path]:
     image_name = Path(asset.image_path).name
     mask_name = Path(asset.mask_path).name
     return TRYON_CLEAN_IMAGE_DIR / image_name, TRYON_CLEAN_MASK_DIR / mask_name
+
+
+def full_asset_paths(asset: AssetMetadata) -> tuple[Path, Path]:
+    processed_image_path = Path(asset.image_path)
+    processed_mask_path = Path(asset.mask_path)
+    if processed_image_path.exists() and processed_mask_path.exists():
+        return processed_image_path, processed_mask_path
+
+    raw_image_path = Path(asset.raw_image_path)
+    raw_mask_path = Path(asset.raw_label_path)
+    if raw_image_path.exists() and raw_mask_path.exists():
+        return raw_image_path, raw_mask_path
+
+    return processed_image_path, processed_mask_path
+
+
+def renderable_asset_paths(asset: AssetMetadata) -> tuple[Path, Path]:
+    clean_image_path, clean_mask_path = tryon_clean_paths(asset)
+    if clean_image_path.exists() and clean_mask_path.exists():
+        return clean_image_path, clean_mask_path
+    return full_asset_paths(asset)
 
 
 class Live2DDemoEngine:
@@ -111,9 +133,21 @@ class Live2DDemoEngine:
         self.selected_index = 0
         self.current_mask: Image.Image | None = None
         self.current_mask_array: Any = None
+        self.target_gender = "any"
 
         self.last_prediction_time = 0.0
         self.last_mask_time = 0.0
+
+    def set_target_gender(self, target_gender: str | None) -> None:
+        normalized = (target_gender or "any").strip().lower()
+        if normalized not in {"any", "male", "female"}:
+            normalized = "any"
+        if normalized != self.target_gender:
+            self.target_gender = normalized
+            self.current_recommendations = []
+            self.selected_index = 0
+            self.last_prediction_time = 0.0
+            self.reset_smoothing()
 
     def close(self) -> None:
         self.face_landmarker.close()
@@ -163,6 +197,37 @@ class Live2DDemoEngine:
         blurred = self.cv2.GaussianBlur(frame, (45, 45), 0)
         suppressed = (blurred * 0.20).astype(self.np.uint8)
         return (mask_3 * suppressed + (1 - mask_3) * frame).astype(self.np.uint8)
+
+    def overlay_hair_on_extended_canvas(
+        self,
+        frame: Any,
+        hair_rgb: Any,
+        hair_alpha: Any,
+        x1: float,
+        y1: float,
+    ) -> Any:
+        pad = OVERLAY_CANVAS_PADDING
+
+        extended = self.cv2.copyMakeBorder(
+            frame,
+            pad,
+            pad,
+            pad,
+            pad,
+            self.cv2.BORDER_CONSTANT,
+            value=(255, 255, 255),
+        )
+
+        extended = self.overlay_hair(
+            extended,
+            hair_rgb,
+            hair_alpha,
+            x1 + pad,
+            y1 + pad,
+        )
+
+        height, width = frame.shape[:2]
+        return extended[pad : pad + height, pad : pad + width]
 
     def overlay_hair(self, frame: Any, hair_rgb: Any, hair_alpha: Any, x1: float, y1: float) -> Any:
         height, width = frame.shape[:2]
@@ -274,7 +339,7 @@ class Live2DDemoEngine:
         face_attributes = FaceAttributes.model_validate(face_analysis.face_attributes)
         response = recommend_hairstyles(
             face_attributes,
-            preferences=RecommendationPreferences(target_gender="any", allow_bangs=True),
+            preferences=RecommendationPreferences(target_gender=self.target_gender, allow_bangs=True),
             top_k=3,
             candidate_assets=live_candidate_assets(),
         )
@@ -329,6 +394,7 @@ class Live2DDemoEngine:
             "image_width": self.current_face_analysis.image_width if self.current_face_analysis else None,
             "image_height": self.current_face_analysis.image_height if self.current_face_analysis else None,
             "selected_asset_id": selected_asset.asset_id if selected_asset is not None else None,
+            "target_gender": self.target_gender,
             "selected_score": (
                 float(self.current_recommendations[self.selected_index].score)
                 if self.current_recommendations
@@ -346,7 +412,7 @@ class Live2DDemoEngine:
         }
 
     def load_project_hair_asset(self, asset: AssetMetadata) -> tuple[Any | None, Any | None]:
-        image_path, mask_path = tryon_clean_paths(asset)
+        image_path, mask_path = renderable_asset_paths(asset)
         if not image_path.exists() or not mask_path.exists():
             return None, None
 
@@ -418,8 +484,18 @@ class Live2DDemoEngine:
                 forehead_y = int((landmarks[10].y + landmarks[151].y) / 2 * height)
                 center_x = int((x_min + x_max) / 2)
 
-                target_width = int(face_width * HAIR_WIDTH_SCALE * self.tuning.scale)
+                # Estimate full head width instead of only face width
+                head_width = face_width * 1.15
+
+                # Preserve large-volume hairstyles
+                target_width = int(
+                    head_width *
+                    HAIR_WIDTH_SCALE *
+                    self.tuning.scale
+                )
+
                 scale = target_width / max(hair_rgb.shape[1], 1)
+
                 new_width = max(int(hair_rgb.shape[1] * scale), 1)
                 new_height = max(int(hair_rgb.shape[0] * scale), 1)
 
@@ -443,7 +519,7 @@ class Live2DDemoEngine:
                 self.smooth_x1 = self.smooth_value(self.smooth_x1, raw_x1, SMOOTHING)
                 self.smooth_y1 = self.smooth_value(self.smooth_y1, raw_y1, SMOOTHING)
 
-                frame = self.overlay_hair(
+                frame = self.overlay_hair_on_extended_canvas(
                     frame,
                     rotated_rgb,
                     rotated_alpha,

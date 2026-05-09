@@ -27,6 +27,20 @@ def _tryon_clean_asset_paths(asset: AssetMetadata) -> tuple[Path, Path]:
     return TRYON_CLEAN_IMAGE_DIR / image_name, TRYON_CLEAN_MASK_DIR / mask_name
 
 
+def _resolve_full_asset_paths(asset: AssetMetadata) -> tuple[Path, Path]:
+    processed_image_path = _resolve_project_path(asset.image_path)
+    processed_mask_path = _resolve_project_path(asset.mask_path)
+    if processed_image_path.exists() and processed_mask_path.exists():
+        return processed_image_path, processed_mask_path
+
+    raw_image_path = _resolve_project_path(asset.raw_image_path)
+    raw_mask_path = _resolve_project_path(asset.raw_label_path)
+    if raw_image_path.exists() and raw_mask_path.exists():
+        return raw_image_path, raw_mask_path
+
+    return processed_image_path, processed_mask_path
+
+
 def _resolve_tryon_asset_paths(
     asset: AssetMetadata,
     *,
@@ -37,7 +51,7 @@ def _resolve_tryon_asset_paths(
         if clean_image_path.exists() and clean_mask_path.exists():
             return clean_image_path, clean_mask_path
 
-    return _resolve_project_path(asset.image_path), _resolve_project_path(asset.mask_path)
+    return _resolve_full_asset_paths(asset)
 
 
 def _average_point(points: list[tuple[float, float]]) -> tuple[float, float]:

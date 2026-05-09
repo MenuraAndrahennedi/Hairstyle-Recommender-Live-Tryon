@@ -374,7 +374,7 @@ def load_reviewed_asset_bank() -> List[AssetMetadata]:
 
 
 def load_asset_bank() -> List[AssetMetadata]:
-    """Runtime try-on bank: prefer the reviewed render-safe live bank."""
+    """Runtime recommendation bank: prefer the reviewed render-safe asset bank."""
     reviewed_render_safe_assets = load_reviewed_render_safe_asset_bank()
     if reviewed_render_safe_assets:
         return reviewed_render_safe_assets
