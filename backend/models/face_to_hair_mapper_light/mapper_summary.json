@@ -1,0 +1,31 @@
+{
+  "mapper_type": "lightweight_frequency_mapper",
+  "baseline_metrics": {
+    "exact_match_accuracy": 0.0,
+    "field_accuracy": {
+      "length": 0.5555555555555556,
+      "curl": 0.4444444444444444,
+      "style_family": 0.1111111111111111
+    }
+  },
+  "selected_metrics": {
+    "exact_match_accuracy": 0.0,
+    "field_accuracy": {
+      "length": 0.5555555555555556,
+      "curl": 0.4444444444444444,
+      "style_family": 0.1111111111111111
+    }
+  },
+  "selected_feature_weights": {
+    "gender": 1.6,
+    "face_fullness": 0.8,
+    "cheekbones": 1.0,
+    "hairline": 1.0
+  },
+  "selected_target_weights": {
+    "length": 1.0,
+    "curl": 1.0,
+    "style_family": 1.25
+  },
+  "tuning_trials": 1944
+}

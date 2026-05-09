@@ -78,15 +78,10 @@ async def process_live_frame(
         )
 
     with _ENGINE_LOCK:
+        if selected_asset_id and engine.current_recommendations:
+            engine.set_selected_asset_by_id(selected_asset_id)
+
         rendered = engine.process_frame(frame.copy())
-        if selected_asset_id:
-            if engine.set_selected_asset_by_id(selected_asset_id):
-                rendered = engine.process_frame(frame.copy())
-            else:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Selected live asset '{selected_asset_id}' is not available in the current recommendations.",
-                )
 
         ok, encoded = engine.cv2.imencode(
             ".jpg",

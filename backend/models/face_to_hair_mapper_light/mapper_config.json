@@ -1,0 +1,238 @@
+{
+  "mapper_type": "lightweight_frequency_mapper",
+  "feature_fields": [
+    "gender",
+    "face_fullness",
+    "cheekbones",
+    "hairline"
+  ],
+  "target_fields": [
+    "length",
+    "curl",
+    "style_family"
+  ],
+  "feature_weights": {
+    "gender": 1.6,
+    "face_fullness": 0.8,
+    "cheekbones": 1.0,
+    "hairline": 1.0
+  },
+  "target_weights": {
+    "length": 1.0,
+    "curl": 1.0,
+    "style_family": 1.25
+  },
+  "train_count": 102,
+  "target_value_counts": {
+    "length": {
+      "long": 50,
+      "short": 51,
+      "medium": 1
+    },
+    "curl": {
+      "straight": 63,
+      "wavy": 38,
+      "curly": 1
+    },
+    "style_family": {
+      "bob": 15,
+      "side_part": 25,
+      "long_layered": 34,
+      "pompadour": 25,
+      "curly_crop": 1,
+      "updo": 1,
+      "center_part": 1
+    }
+  },
+  "target_vocab": {
+    "length": [
+      "long",
+      "medium",
+      "short"
+    ],
+    "curl": [
+      "curly",
+      "straight",
+      "wavy"
+    ],
+    "style_family": [
+      "bob",
+      "center_part",
+      "curly_crop",
+      "long_layered",
+      "pompadour",
+      "side_part",
+      "updo"
+    ]
+  },
+  "conditional_counts": {
+    "length": {
+      "gender": {
+        "female": {
+          "long": 47,
+          "short": 10,
+          "medium": 1
+        },
+        "male": {
+          "short": 41,
+          "long": 3
+        }
+      },
+      "face_fullness": {
+        "slim": {
+          "long": 49,
+          "short": 48,
+          "medium": 1
+        },
+        "full": {
+          "long": 1,
+          "short": 3
+        }
+      },
+      "cheekbones": {
+        "soft": {
+          "long": 27,
+          "short": 30,
+          "medium": 1
+        },
+        "high": {
+          "short": 21,
+          "long": 23
+        }
+      },
+      "hairline": {
+        "receding": {
+          "long": 1,
+          "short": 3
+        },
+        "regular": {
+          "long": 49,
+          "short": 48,
+          "medium": 1
+        }
+      }
+    },
+    "curl": {
+      "gender": {
+        "female": {
+          "straight": 24,
+          "wavy": 33,
+          "curly": 1
+        },
+        "male": {
+          "straight": 39,
+          "wavy": 5
+        }
+      },
+      "face_fullness": {
+        "slim": {
+          "straight": 60,
+          "wavy": 37,
+          "curly": 1
+        },
+        "full": {
+          "wavy": 1,
+          "straight": 3
+        }
+      },
+      "cheekbones": {
+        "soft": {
+          "straight": 39,
+          "wavy": 18,
+          "curly": 1
+        },
+        "high": {
+          "straight": 24,
+          "wavy": 20
+        }
+      },
+      "hairline": {
+        "receding": {
+          "straight": 3,
+          "wavy": 1
+        },
+        "regular": {
+          "wavy": 37,
+          "straight": 60,
+          "curly": 1
+        }
+      }
+    },
+    "style_family": {
+      "gender": {
+        "female": {
+          "bob": 14,
+          "pompadour": 2,
+          "long_layered": 32,
+          "curly_crop": 1,
+          "updo": 1,
+          "side_part": 7,
+          "center_part": 1
+        },
+        "male": {
+          "side_part": 18,
+          "long_layered": 2,
+          "pompadour": 23,
+          "bob": 1
+        }
+      },
+      "face_fullness": {
+        "slim": {
+          "bob": 15,
+          "side_part": 22,
+          "long_layered": 33,
+          "pompadour": 25,
+          "curly_crop": 1,
+          "updo": 1,
+          "center_part": 1
+        },
+        "full": {
+          "long_layered": 1,
+          "side_part": 3
+        }
+      },
+      "cheekbones": {
+        "soft": {
+          "bob": 6,
+          "side_part": 15,
+          "long_layered": 21,
+          "curly_crop": 1,
+          "pompadour": 15
+        },
+        "high": {
+          "pompadour": 10,
+          "long_layered": 13,
+          "bob": 9,
+          "updo": 1,
+          "side_part": 10,
+          "center_part": 1
+        }
+      },
+      "hairline": {
+        "receding": {
+          "bob": 1,
+          "side_part": 1,
+          "pompadour": 2
+        },
+        "regular": {
+          "bob": 14,
+          "long_layered": 34,
+          "pompadour": 23,
+          "side_part": 24,
+          "curly_crop": 1,
+          "updo": 1,
+          "center_part": 1
+        }
+      }
+    }
+  },
+  "val_count": 18,
+  "best_metrics": {
+    "exact_match_accuracy": 0.0,
+    "field_accuracy": {
+      "length": 0.5555555555555556,
+      "curl": 0.4444444444444444,
+      "style_family": 0.1111111111111111
+    }
+  }
+}
