@@ -5,8 +5,8 @@ import {
   fetchAssetBankSummary,
   fetchLive2dInfo,
   generateGenerativePackage,
-  processLive2dFrame,
   generateTryOn,
+  live2dWsUrl,
   recommendHairstyles,
   resolveMediaUrl,
 } from "./api/client.js";
@@ -717,6 +717,19 @@ function StaticTryOnScreen() {
           uploadLabel={imageFile ? "Change Photo" : "Upload Photo"}
         />
 
+        <div className="live-debug-panel">
+          <p>
+            <strong>Selected:</strong> {selectedAssetId || "None"}
+          </p>
+          <p>
+            <strong>Recommendations:</strong> {recommendations.length}
+          </p>
+          <p>
+            <strong>Status:</strong>{" "}
+            {wsConnected ? "Connected" : "Disconnected"}
+          </p>
+        </div>
+
         <RecommendationGrid
           title="Recommended Hairstyles"
           subtitle="AI-generated styles for you"
@@ -994,31 +1007,48 @@ function GenerativeTryOnScreen() {
 
 function Live2DTryOnScreen() {
   const videoRef = useRef(null);
+  const streamRef = useRef(null);
+  const socketRef = useRef(null);
   const selectedAssetRef = useRef("");
+  const pendingFrameRef = useRef(false);
+  const latestFrameUrlRef = useRef("");
+  const sendLoopTimerRef = useRef(null);
+  const frameCanvasRef = useRef(null);
+
   const [liveInfo, setLiveInfo] = useState(null);
   const [cameraError, setCameraError] = useState("");
   const [cameraReady, setCameraReady] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [recommendations, setRecommendations] = useState([]);
+  const [liveStats, setLiveStats] = useState(null);
   const [selectedAssetId, setSelectedAssetId] = useState("");
   const [facingMode, setFacingMode] = useState("user");
   const [processedFrameUrl, setProcessedFrameUrl] = useState("");
-  const streamRef = useRef(null);
-  const refreshingRef = useRef(false);
+  const [wsConnected, setWsConnected] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+
     fetchLive2dInfo()
       .then((payload) => {
         if (!cancelled) {
           setLiveInfo(payload);
+
+          if (payload.status !== "project_ready") {
+            setCameraError(
+              "Live 2D backend is not ready. Check models and assets.",
+            );
+          }
         }
       })
-      .catch(() => {
+      .catch((error) => {
         if (!cancelled) {
+          console.error("Live 2D info failed:", error);
           setLiveInfo(null);
+          setCameraError("Could not connect to the Live 2D backend.");
         }
       });
+
     return () => {
       cancelled = true;
     };
@@ -1036,18 +1066,28 @@ function Live2DTryOnScreen() {
       try {
         setCameraError("");
         setCameraReady(false);
+
         if (streamRef.current) {
           streamRef.current.getTracks().forEach((track) => track.stop());
         }
+
         const nextStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode },
+          video: {
+            facingMode,
+            width: { ideal: 640, max: 640 },
+            height: { ideal: 480, max: 480 },
+            frameRate: { ideal: 15, max: 15 },
+          },
           audio: false,
         });
+
         if (!active) {
           nextStream.getTracks().forEach((track) => track.stop());
           return;
         }
+
         streamRef.current = nextStream;
+
         if (videoRef.current) {
           videoRef.current.srcObject = nextStream;
           await videoRef.current.play();
@@ -1066,6 +1106,7 @@ function Live2DTryOnScreen() {
 
     return () => {
       active = false;
+
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
       }
@@ -1076,8 +1117,18 @@ function Live2DTryOnScreen() {
     selectedAssetRef.current = selectedAssetId;
   }, [selectedAssetId]);
 
-  async function captureFrameFile() {
+  useEffect(() => {
+    return () => {
+      if (latestFrameUrlRef.current) {
+        URL.revokeObjectURL(latestFrameUrlRef.current);
+        latestFrameUrlRef.current = "";
+      }
+    };
+  }, []);
+
+  async function captureFrameBlob() {
     const video = videoRef.current;
+
     if (!video || !video.videoWidth || !video.videoHeight) {
       throw new Error("Camera frame is not ready yet.");
     }
@@ -1087,86 +1138,261 @@ function Live2DTryOnScreen() {
       1,
       maxSide / Math.max(video.videoWidth, video.videoHeight),
     );
-    const canvas = document.createElement("canvas");
+
+    const canvas = frameCanvasRef.current ?? document.createElement("canvas");
+    frameCanvasRef.current = canvas;
+
     canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
     canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+
     const context = canvas.getContext("2d");
+
     if (!context) {
       throw new Error("Could not initialize the live frame capture canvas.");
     }
+
     context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
     const blob = await new Promise((resolve) =>
-      canvas.toBlob(resolve, "image/jpeg", 0.72),
+      canvas.toBlob(resolve, "image/jpeg", 0.7),
     );
+
     if (!blob) {
       throw new Error("Could not capture a live frame.");
     }
-    return new File([blob], "live-frame.jpg", { type: "image/jpeg" });
+
+    return blob;
   }
 
-  async function refreshLiveFrame(
-    nextSelectedAssetId = selectedAssetRef.current,
-  ) {
-    if (refreshingRef.current) return;
+  function sendControlAction(action) {
+    const socket = socketRef.current;
+
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      return;
+    }
+
+    socket.send(
+      JSON.stringify({
+        type: "control",
+        action,
+        selected_asset_id: selectedAssetRef.current || "",
+      }),
+    );
+
+    sendLiveFrame();
+  }
+
+  async function sendLiveFrame(nextSelectedAssetId = selectedAssetRef.current) {
+    const socket = socketRef.current;
+
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      return;
+    }
+
+    // Important: drop frames while backend is still processing previous one.
+    if (pendingFrameRef.current) {
+      return;
+    }
 
     try {
-      refreshingRef.current = true;
+      pendingFrameRef.current = true;
       setIsRefreshing(true);
-      setCameraError("");
 
-      if (liveInfo?.status !== "project_ready") {
-        throw new Error("Live 2D backend is not ready yet.");
-      }
-
-      const frameFile = await captureFrameFile();
-      const payload = await processLive2dFrame(frameFile, nextSelectedAssetId);
-
-      setProcessedFrameUrl(payload.frame_data_url ?? "");
-      setRecommendations(payload.recommendations ?? []);
-
-      const nextSelected =
-        payload.selected_asset_id ??
-        payload.recommendations?.[0]?.asset_id ??
-        "";
-
-      setSelectedAssetId(nextSelected);
-    } catch (error) {
-      setCameraError(
-        error instanceof Error
-          ? error.message
-          : "Could not refresh the live 2D backend frame.",
+      socket.send(
+        JSON.stringify({
+          type: "control",
+          selected_asset_id: nextSelectedAssetId || "",
+        }),
       );
-    } finally {
-      refreshingRef.current = false;
+
+      const blob = await captureFrameBlob();
+      socket.send(blob);
+    } catch (error) {
+      pendingFrameRef.current = false;
       setIsRefreshing(false);
+      setCameraError(
+        error instanceof Error ? error.message : "Could not send live frame.",
+      );
     }
   }
 
   useEffect(() => {
-    if (!cameraReady || liveInfo?.status !== "project_ready") return;
+    function handleKeyDown(event) {
+      const key = event.key.toLowerCase();
 
-    let cancelled = false;
-    let timer = null;
+      if (
+        [
+          "arrowup",
+          "arrowdown",
+          "arrowleft",
+          "arrowright",
+          "w",
+          "s",
+          "a",
+          "d",
+          "t",
+          "r",
+          "i",
+          "j",
+          "k",
+          "l",
+        ].includes(key)
+      ) {
+        event.preventDefault();
+      }
 
-    async function loop() {
-      if (cancelled) return;
-
-      await refreshLiveFrame();
-
-      if (!cancelled) {
-        timer = window.setTimeout(loop, 500);
+      if (key === "arrowleft" || key === "j") {
+        sendControlAction("move_left");
+      } else if (key === "arrowright" || key === "l") {
+        sendControlAction("move_right");
+      } else if (key === "arrowup" || key === "i") {
+        sendControlAction("move_up");
+      } else if (key === "arrowdown" || key === "k") {
+        sendControlAction("move_down");
+      } else if (key === "w") {
+        sendControlAction("scale_up");
+      } else if (key === "s") {
+        sendControlAction("scale_down");
+      } else if (key === "a") {
+        sendControlAction("rotate_left");
+      } else if (key === "d") {
+        sendControlAction("rotate_right");
+      } else if (key === "t") {
+        sendControlAction("reset");
+      } else if (key === "r") {
+        sendControlAction("cycle");
       }
     }
 
-    timer = window.setTimeout(loop, 300);
+    window.addEventListener("keydown", handleKeyDown);
 
     return () => {
-      cancelled = true;
-      if (timer) {
-        window.clearTimeout(timer);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [cameraReady, wsConnected]);
+
+  useEffect(() => {
+    if (!cameraReady || liveInfo?.status !== "project_ready") {
+      return;
+    }
+
+    let closedByEffect = false;
+    const socket = new WebSocket(live2dWsUrl());
+
+    socket.binaryType = "blob";
+    socketRef.current = socket;
+
+    socket.onopen = () => {
+      setWsConnected(true);
+      setCameraError("");
+
+      socket.send(
+        JSON.stringify({
+          type: "control",
+          selected_asset_id: selectedAssetRef.current || "",
+        }),
+      );
+
+      sendLoopTimerRef.current = window.setInterval(() => {
+        sendLiveFrame();
+      }, 100);
+    };
+
+    socket.onmessage = (event) => {
+      if (typeof event.data === "string") {
+        try {
+          const payload = JSON.parse(event.data);
+
+          if (payload.type === "error") {
+            pendingFrameRef.current = false;
+            setIsRefreshing(false);
+            setCameraError(payload.message || "Live 2D backend error.");
+            return;
+          }
+
+          if (payload.type === "metadata") {
+            setRecommendations(payload.recommendations ?? []);
+
+            setLiveStats({
+              selectedScore: payload.selected_score ?? 0,
+              topPicks: payload.top_picks ?? 0,
+              cleanBank: payload.clean_bank ?? 0,
+              tuning: payload.tuning ?? {
+                x: 0,
+                y: 0,
+                scale: 1,
+                rotation: 0,
+              },
+            });
+
+            const nextSelected =
+              payload.selected_asset_id ??
+              payload.recommendations?.[0]?.asset_id ??
+              "";
+
+            setSelectedAssetId(nextSelected);
+          }
+        } catch (error) {
+          console.error("Could not parse Live 2D metadata:", error);
+        }
+
+        return;
+      }
+
+      const blob =
+        event.data instanceof Blob
+          ? event.data
+          : new Blob([event.data], { type: "image/jpeg" });
+
+      const nextUrl = URL.createObjectURL(blob);
+
+      if (latestFrameUrlRef.current) {
+        URL.revokeObjectURL(latestFrameUrlRef.current);
+      }
+
+      latestFrameUrlRef.current = nextUrl;
+      setProcessedFrameUrl(nextUrl);
+
+      pendingFrameRef.current = false;
+      setIsRefreshing(false);
+    };
+
+    socket.onerror = () => {
+      pendingFrameRef.current = false;
+      setIsRefreshing(false);
+      setCameraError("Live 2D WebSocket connection failed.");
+    };
+
+    socket.onclose = () => {
+      pendingFrameRef.current = false;
+      setIsRefreshing(false);
+      setWsConnected(false);
+
+      if (!closedByEffect) {
+        setCameraError("Live 2D WebSocket disconnected.");
       }
     };
+
+    return () => {
+      closedByEffect = true;
+
+      if (sendLoopTimerRef.current) {
+        window.clearInterval(sendLoopTimerRef.current);
+        sendLoopTimerRef.current = null;
+      }
+
+      pendingFrameRef.current = false;
+      setIsRefreshing(false);
+      setWsConnected(false);
+
+      socket.close();
+    };
   }, [cameraReady, liveInfo?.status]);
+
+  const selectedRecommendation =
+    recommendations.find((item) => item.asset_id === selectedAssetId) ??
+    recommendations[0] ??
+    null;
 
   return (
     <section className="page live-page">
@@ -1181,19 +1407,26 @@ function Live2DTryOnScreen() {
       </div>
 
       <StatusBanner
-        state={isRefreshing ? "Refreshing live recommendations..." : ""}
+        state={
+          isRefreshing
+            ? "Streaming live frame..."
+            : wsConnected
+              ? "Live WebSocket connected"
+              : ""
+        }
         error={cameraError}
         message={
           liveInfo?.status === "project_ready"
-            ? `Live 2D backend ready with ${liveInfo.readiness?.tryon_clean_candidate_count ?? 0} clean overlay assets`
+            ? `Live 2D backend ready with ${
+                liveInfo.readiness?.tryon_clean_candidate_count ?? 0
+              } clean overlay assets`
             : ""
         }
       />
-
-      <section className="glass-card live-stage-card">
+      <section className="glass-card live-stage-card live-wide-card">
         <div className="stage-topbar">
           <span className="live-chip">
-            <span className={`live-dot ${cameraReady ? "on" : ""}`} />
+            <span className={`live-dot ${wsConnected ? "on" : ""}`} />
             Live 2D Try-On
           </span>
           <span className="camera-chip">
@@ -1202,85 +1435,212 @@ function Live2DTryOnScreen() {
           </span>
         </div>
 
-        <div className="live-stage">
-          <video
-            ref={videoRef}
-            className="live-video live-video-source"
-            playsInline
-            muted
-          />
-          {processedFrameUrl ? (
-            <img
-              src={processedFrameUrl}
-              alt="Live 2D backend output"
-              className="live-video"
-            />
-          ) : (
-            <div className="empty-panel">Waiting for backend live frame...</div>
-          )}
+        <div className="live-2d-layout">
+          <aside className="live-side-panel">
+            <div className="live-instruction-card">
+              <h3>Move Hair</h3>
+              <div className="live-instruction-list">
+                <p>
+                  <strong>Arrow keys</strong> or <strong>I/J/K/L</strong> — move
+                  hair
+                </p>
+                <p>
+                  <strong>W / S</strong> — increase / decrease size
+                </p>
+                <p>
+                  <strong>A / D</strong> — rotate left / right
+                </p>
+                <p>
+                  <strong>R</strong> — cycle hairstyle
+                </p>
+                <p>
+                  <strong>T</strong> — reset tuning
+                </p>
+              </div>
+            </div>
+          </aside>
+          <div className="live-main-panel">
+            <div className="live-stage">
+              <video
+                ref={videoRef}
+                className="live-video live-video-source"
+                playsInline
+                muted
+              />
 
-          <div className="live-stage-note">
-            <SparkleIcon />
-            <div>
-              <strong>
-                {cameraReady ? "Tracking your face" : "Waiting for camera"}
-              </strong>
-              <span>
-                {cameraReady
-                  ? "Rendering the actual backend live 2D try-on engine"
-                  : "Allow camera access to continue"}
-              </span>
+              {processedFrameUrl ? (
+                <img
+                  src={processedFrameUrl}
+                  alt="Live 2D backend output"
+                  className="live-video"
+                />
+              ) : (
+                <div className="empty-panel">
+                  Waiting for backend live frame...
+                </div>
+              )}
+
+              <button
+                type="button"
+                className="flip-camera"
+                onClick={() =>
+                  setFacingMode((current) =>
+                    current === "user" ? "environment" : "user",
+                  )
+                }
+              >
+                <FlipIcon />
+                Flip Camera
+              </button>
+            </div>
+
+            <div className="live-toolbar">
+              <div className="gender-inline">
+                <span>Backend engine:</span>
+                <strong>WebSocket live 2D try-on</strong>
+              </div>
+
+              <button
+                type="button"
+                className="secondary-pill"
+                onClick={() => sendLiveFrame()}
+                disabled={!cameraReady || !wsConnected || isRefreshing}
+              >
+                <RefreshIcon />
+                Refresh Live Frame
+              </button>
             </div>
           </div>
 
-          <button
-            type="button"
-            className="flip-camera"
-            onClick={() =>
-              setFacingMode((current) =>
-                current === "user" ? "environment" : "user",
-              )
-            }
-          >
-            <FlipIcon />
-            Flip Camera
-          </button>
-        </div>
+          <aside className="live-side-panel">
+            <div className="live-recommend-card">
+              <h3>Hairstyles</h3>
 
-        <div className="live-toolbar">
-          <div className="gender-inline">
-            <span>Backend engine:</span>
-            <strong>Original live 2D try-on</strong>
-          </div>
+              <div className="live-mini-grid">
+                {recommendations.map((item) => (
+                  <button
+                    key={item.asset_id}
+                    type="button"
+                    className={`live-mini-card ${
+                      selectedAssetId === item.asset_id ? "active" : ""
+                    }`}
+                    onClick={() => {
+                      setSelectedAssetId(item.asset_id);
+                      selectedAssetRef.current = item.asset_id;
 
-          <button
-            type="button"
-            className="secondary-pill"
-            onClick={() => refreshLiveFrame()}
-            disabled={!cameraReady || isRefreshing}
-          >
-            <RefreshIcon />
-            Refresh Live Frame
-          </button>
+                      const socket = socketRef.current;
+
+                      if (socket && socket.readyState === WebSocket.OPEN) {
+                        socket.send(
+                          JSON.stringify({
+                            type: "control",
+                            selected_asset_id: item.asset_id,
+                          }),
+                        );
+                      }
+
+                      if (cameraReady && wsConnected) {
+                        sendLiveFrame(item.asset_id);
+                      }
+                    }}
+                  >
+                    {item.image_url ? (
+                      <img
+                        src={resolveMediaUrl(
+                          item.image_url,
+                          SYSTEM_BASE_PATHS.live2d,
+                        )}
+                        alt={item.asset_id}
+                      />
+                    ) : null}
+
+                    <span className="live-mini-meta">
+                      <strong>
+                        {formatAssetName(
+                          item.asset_id,
+                          item.normalized_attributes,
+                        )}
+                      </strong>
+                      <small>
+                        {Math.round((item.score ?? 0) * 100)}% match
+                      </small>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </aside>
         </div>
       </section>
 
-      <RecommendationGrid
-        title="Recommended Hairstyles"
-        subtitle="Tap a hairstyle to preview it live on you"
-        recommendations={recommendations}
-        selectedAssetId={selectedAssetId}
-        onSelect={(item) => {
-          setSelectedAssetId(item.asset_id);
-          selectedAssetRef.current = item.asset_id;
-          if (cameraReady && !isRefreshing) {
-            refreshLiveFrame(item.asset_id);
-          }
-        }}
-        compact
-        mediaBasePath={SYSTEM_BASE_PATHS.live2d}
-        footer="Hairstyles are previewed in real-time. Your data is not stored."
-      />
+      <section className="glass-card live-details-card">
+        <div className="section-title">
+          <div className="section-icon pink-icon">
+            <SparkleIcon />
+          </div>
+          <div>
+            <h2>Selected Hair Match Details</h2>
+            <p>
+              Recommendation and manual tuning details are shown here instead of
+              on the camera window.
+            </p>
+          </div>
+        </div>
+
+        <div className="live-stats-grid">
+          <div className="live-stat-box">
+            <span>Selected hairstyle</span>
+            <strong>{selectedRecommendation?.asset_id ?? "None"}</strong>
+          </div>
+
+          <div className="live-stat-box">
+            <span>Recommendation score</span>
+            <strong>
+              {Math.round((liveStats?.selectedScore ?? 0) * 100)}%
+            </strong>
+          </div>
+
+          <div className="live-stat-box">
+            <span>Top picks</span>
+            <strong>{liveStats?.topPicks ?? recommendations.length}</strong>
+          </div>
+
+          <div className="live-stat-box">
+            <span>Clean bank</span>
+            <strong>
+              {liveStats?.cleanBank ??
+                liveInfo?.readiness?.tryon_clean_candidate_count ??
+                0}
+            </strong>
+          </div>
+
+          <div className="live-stat-box">
+            <span>X offset</span>
+            <strong>{liveStats?.tuning?.x ?? 0}</strong>
+          </div>
+
+          <div className="live-stat-box">
+            <span>Y offset</span>
+            <strong>{liveStats?.tuning?.y ?? 0}</strong>
+          </div>
+
+          <div className="live-stat-box">
+            <span>Scale</span>
+            <strong>{liveStats?.tuning?.scale ?? 1}</strong>
+          </div>
+
+          <div className="live-stat-box">
+            <span>Rotation</span>
+            <strong>{liveStats?.tuning?.rotation ?? 0}</strong>
+          </div>
+        </div>
+
+        {selectedRecommendation?.reason ? (
+          <p className="panel-footer live-reason">
+            <strong>Reason:</strong> {selectedRecommendation.reason}
+          </p>
+        ) : null}
+      </section>
     </section>
   );
 }

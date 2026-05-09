@@ -1,14 +1,23 @@
 from __future__ import annotations
 
 import base64
+import json
 import threading
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
+from fastapi import (
+    APIRouter,
+    File,
+    Form,
+    HTTPException,
+    UploadFile,
+    WebSocket,
+    WebSocketDisconnect,
+    status,
+)
 
 from app.factory import build_subsystem_app
 from .config import FACE_LANDMARKER_PATH, WEBCAM_RUNNER_PATH
-from .core.demo_engine import Live2DDemoEngine, runtime_readiness
-
+from .core.demo_engine import Live2DDemoEngine, ManualTuning, runtime_readiness
 
 app = build_subsystem_app(
     title="Hairstyle Recommender Live 2D Try-On API",
@@ -103,5 +112,134 @@ async def process_live_frame(
         **payload,
     }
 
+@router.websocket("/ws")
+async def live_2d_websocket(websocket: WebSocket) -> None:
+    await websocket.accept()
 
+    engine = get_engine()
+    selected_asset_id: str | None = None
+
+    try:
+        while True:
+            message = await websocket.receive()
+
+            # Receive control messages from frontend
+            if "text" in message and message["text"] is not None:
+                try:
+                    control = json.loads(message["text"])
+                except json.JSONDecodeError:
+                    continue
+
+                next_asset_id = control.get("selected_asset_id")
+                if next_asset_id:
+                    selected_asset_id = next_asset_id
+
+                action = control.get("action")
+
+                if action == "move_left":
+                    engine.tuning.x_offset -= 5
+
+                elif action == "move_right":
+                    engine.tuning.x_offset += 5
+
+                elif action == "move_up":
+                    engine.tuning.y_offset -= 5
+
+                elif action == "move_down":
+                    engine.tuning.y_offset += 5
+
+                elif action == "scale_up":
+                    engine.tuning.scale += 0.05
+
+                elif action == "scale_down":
+                    engine.tuning.scale = max(
+                        0.3,
+                        engine.tuning.scale - 0.05
+                    )
+
+                elif action == "rotate_left":
+                    engine.tuning.rotation -= 3
+
+                elif action == "rotate_right":
+                    engine.tuning.rotation += 3
+
+                elif action == "reset":
+                    engine.tuning = ManualTuning()
+                    engine.reset_smoothing()
+
+                elif action == "cycle":
+                    if engine.current_recommendations:
+                        engine.selected_index = (
+                            engine.selected_index + 1
+                        ) % len(engine.current_recommendations)
+
+                        engine.reset_smoothing()
+
+                continue
+
+            # Receive camera frame as binary JPEG
+            if "bytes" not in message or message["bytes"] is None:
+                continue
+
+            image_bytes = message["bytes"]
+
+            frame_array = engine.np.frombuffer(image_bytes, dtype=engine.np.uint8)
+            frame = engine.cv2.imdecode(frame_array, engine.cv2.IMREAD_COLOR)
+
+            if frame is None:
+                await websocket.send_text(
+                    json.dumps(
+                        {
+                            "type": "error",
+                            "message": "Live frame could not be decoded.",
+                        }
+                    )
+                )
+                continue
+
+            with _ENGINE_LOCK:
+                engine.show_hud = False
+
+                if selected_asset_id and engine.current_recommendations:
+                    engine.set_selected_asset_by_id(selected_asset_id)
+
+                rendered = engine.process_frame(frame.copy())
+                
+                ok, encoded = engine.cv2.imencode(
+                    ".jpg",
+                    rendered,
+                    [int(engine.cv2.IMWRITE_JPEG_QUALITY), 75],
+                )
+
+                if not ok:
+                    await websocket.send_text(
+                        json.dumps(
+                            {
+                                "type": "error",
+                                "message": "Backend live frame encoding failed.",
+                            }
+                        )
+                    )
+                    continue
+
+                payload = engine.current_response_payload()
+
+            # Send metadata as text
+            await websocket.send_text(
+                json.dumps(
+                    {
+                        "type": "metadata",
+                        "success": True,
+                        **payload,
+                    }
+                )
+            )
+
+            # Send rendered frame as binary JPEG
+            await websocket.send_bytes(encoded.tobytes())
+
+    except WebSocketDisconnect:
+        print("Live 2D websocket disconnected")
+
+        
 app.include_router(router)
