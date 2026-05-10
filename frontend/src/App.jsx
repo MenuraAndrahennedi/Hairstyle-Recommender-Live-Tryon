@@ -886,11 +886,28 @@ function GenerativeTryOnScreen() {
     setRecommendations([]);
     setSelectedAssetId("");
     setPreparedPackages({});
+    setBusyState("");
     setError("");
     setFeedback("");
-    if (!file) return;
+
+    // Do not auto-run generative try-on after upload.
+    // User must click "See Results".
+  }
+
+  async function handleSeeResults() {
+    if (!imageFile) {
+      setError("Please upload an image first.");
+      return;
+    }
+
+    setRecommendations([]);
+    setSelectedAssetId("");
+    setPreparedPackages({});
+    setError("");
+    setFeedback("");
+
     try {
-      await refreshRecommendations(file, gender);
+      await refreshRecommendations(imageFile, gender);
     } catch (nextError) {
       setBusyState("");
       setError(
@@ -993,9 +1010,40 @@ function GenerativeTryOnScreen() {
           onClear={() => handleFileChange(null)}
           onGenderChange={handleGenderChange}
           uploadLabel={imageFile ? "Upload Another Image" : "Upload Image"}
-          helper="Your photos are secure and private. We don't store your images."
+          helper={
+            <button
+              type="button"
+              className="primary-gradient see-results"
+              onClick={handleSeeResults}
+              disabled={!imageFile || Boolean(busyState)}
+            >
+              See Results
+            </button>
+          }
         />
 
+        <ResultCard
+          title="Generative Result"
+          subtitle={
+            result?.final_generation_completed
+              ? "AI-generated final hairstyle result"
+              : "AI-generated try-on preview"
+          }
+          imageUrl={displayImageUrl}
+          emptyMessage={
+            busyState
+              ? "Processing, please wait. This may take about 10 minute..."
+              : imageFile
+                ? "Click See Results to generate your generative try-on."
+                : "Upload an image to begin."
+          }
+          onDownload={() =>
+            downloadFile(
+              displayImageUrl,
+              `${selectedAssetId || "generative-tryon"}.png`,
+            )
+          }
+        ></ResultCard>
         <RecommendationGrid
           title="Recommended Hairstyles"
           subtitle="AI suggestions tailored for you"
@@ -1016,63 +1064,6 @@ function GenerativeTryOnScreen() {
             </button>
           }
         />
-
-        <ResultCard
-          title="Generative Result"
-          subtitle={
-            result?.final_generation_completed
-              ? "AI-generated final hairstyle result"
-              : "AI-generated try-on preview"
-          }
-          imageUrl={displayImageUrl}
-          onDownload={() =>
-            downloadFile(
-              displayImageUrl,
-              `${selectedAssetId || "generative-tryon"}.png`,
-            )
-          }
-          extraActions={
-            <button
-              type="button"
-              className="secondary-pill"
-              disabled={!displayImageUrl}
-              onClick={async () => {
-                if (!displayImageUrl) return;
-                if (navigator.share) {
-                  await navigator.share({
-                    title: result?.final_generation_completed
-                      ? "Generative Try-On Result"
-                      : "Generative Try-On Preview",
-                    url: displayImageUrl,
-                  });
-                  return;
-                }
-                await navigator.clipboard.writeText(displayImageUrl);
-              }}
-            >
-              <ShareIcon />
-              Share
-            </button>
-          }
-        >
-          <div className="feedback-row">
-            <span>Happy with the result?</span>
-            <button
-              type="button"
-              className={`icon-pill ${feedback === "up" ? "active" : ""}`}
-              onClick={() => setFeedback("up")}
-            >
-              <ThumbUpIcon />
-            </button>
-            <button
-              type="button"
-              className={`icon-pill ${feedback === "down" ? "active" : ""}`}
-              onClick={() => setFeedback("down")}
-            >
-              <ThumbDownIcon />
-            </button>
-          </div>
-        </ResultCard>
       </div>
     </section>
   );
