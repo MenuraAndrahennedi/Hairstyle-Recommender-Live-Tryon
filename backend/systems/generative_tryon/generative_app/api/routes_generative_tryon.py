@@ -67,11 +67,21 @@ async def generate_generative_tryon_package(
         try:
             final_generation = run_generative_inpaint(
                 package["manifest_path"],
-                extra_prompt="Keep the subject realistic and retain a natural forehead transition.",
+                extra_prompt=(
+                    "Use the selected reference hairstyle image as the main guide. "
+                    "Match its silhouette, hair flow, front shape, side volume, color, and texture. "
+                    "Do not invent a different hairstyle. Preserve the person's face, skin, clothing, and background."
+                ),
+                use_ip_adapter=True,
+                ip_adapter_scale=0.85,
+                strength=0.92,
+                guidance_scale=7.0,
+                num_inference_steps=35,
             )
             final_image_path = final_generation.get("output_image_path")
             final_metadata_path = final_generation.get("metadata_path")
             final_generation_completed = True
+            
         except Exception as exc:  # pragma: no cover - route fallback
             logger.exception("Final generative inpaint failed: %s", exc)
             final_generation_error = str(exc)
