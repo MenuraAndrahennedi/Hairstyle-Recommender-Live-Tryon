@@ -65,7 +65,10 @@ async def generate_generative_tryon_package(
 
     if package is not None and package.get("manifest_path"):
         try:
-            final_generation = run_generative_inpaint(package["manifest_path"])
+            final_generation = run_generative_inpaint(
+                package["manifest_path"],
+                extra_prompt="Keep the subject realistic and retain a natural forehead transition.",
+            )
             final_image_path = final_generation.get("output_image_path")
             final_metadata_path = final_generation.get("metadata_path")
             final_generation_completed = True

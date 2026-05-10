@@ -862,21 +862,33 @@ function GenerativeTryOnScreen() {
       RECOMMENDATION_COUNT,
       SYSTEM_BASE_PATHS.staticAuto,
     );
-    setRecommendations(nextRecommendations);
-    setSelectedAssetId(nextRecommendations[0]?.asset_id ?? "");
-    if (!nextRecommendations.length) {
+
+    // Keep only the first recommendation for Generative Try-On
+    const firstRecommendation = nextRecommendations[0]
+      ? [nextRecommendations[0]]
+      : [];
+
+    setRecommendations(firstRecommendation);
+    setSelectedAssetId(firstRecommendation[0]?.asset_id ?? "");
+
+    if (!firstRecommendation.length) {
       setPreparedPackages({});
       setBusyState("");
       return;
     }
-    setBusyState("Preparing generative previews...");
-    const generatedEntries = await Promise.all(
-      nextRecommendations.map(async (item) => [
-        item.asset_id,
-        await generateGenerativePackage(file, item.asset_id),
-      ]),
+
+    setBusyState("Generating final generative try-on...");
+
+    const firstItem = firstRecommendation[0];
+    const generatedResult = await generateGenerativePackage(
+      file,
+      firstItem.asset_id,
     );
-    setPreparedPackages(Object.fromEntries(generatedEntries));
+
+    setPreparedPackages({
+      [firstItem.asset_id]: generatedResult,
+    });
+
     setBusyState("");
   }
 
@@ -945,30 +957,47 @@ function GenerativeTryOnScreen() {
 
   async function handleGenderChange(nextGender) {
     setGender(nextGender);
+
     if (imageFile && analysis?.face_attributes) {
       try {
         setBusyState("Refreshing recommendations...");
+        setError("");
+
         const nextRecommendations = await recommendHairstyles(
           analysis.face_attributes,
           nextGender,
           RECOMMENDATION_COUNT,
           SYSTEM_BASE_PATHS.staticAuto,
         );
-        setRecommendations(nextRecommendations);
-        setSelectedAssetId(nextRecommendations[0]?.asset_id ?? "");
-        if (!nextRecommendations.length) {
+
+        // Keep only the first recommendation for Generative Try-On
+        const firstRecommendation = nextRecommendations[0]
+          ? [nextRecommendations[0]]
+          : [];
+
+        setRecommendations(firstRecommendation);
+        setSelectedAssetId(firstRecommendation[0]?.asset_id ?? "");
+
+        if (!firstRecommendation.length) {
           setPreparedPackages({});
           setBusyState("");
           return;
         }
-        setBusyState("Preparing generative previews...");
-        const generatedEntries = await Promise.all(
-          nextRecommendations.map(async (item) => [
-            item.asset_id,
-            await generateGenerativePackage(imageFile, item.asset_id),
-          ]),
+
+        setPreparedPackages({});
+        setBusyState("Generating final generative try-on...");
+
+        const firstItem = firstRecommendation[0];
+
+        const firstResult = await generateGenerativePackage(
+          imageFile,
+          firstItem.asset_id,
         );
-        setPreparedPackages(Object.fromEntries(generatedEntries));
+
+        setPreparedPackages({
+          [firstItem.asset_id]: firstResult,
+        });
+
         setBusyState("");
       } catch (nextError) {
         setBusyState("");
@@ -1044,26 +1073,28 @@ function GenerativeTryOnScreen() {
             )
           }
         ></ResultCard>
-        <RecommendationGrid
-          title="Recommended Hairstyles"
-          subtitle="AI suggestions tailored for you"
-          recommendations={recommendations}
-          selectedAssetId={selectedAssetId}
-          onSelect={handleSelect}
-          footer=""
-          mediaBasePath={SYSTEM_BASE_PATHS.staticAuto}
-          action={
-            <button
-              type="button"
-              className="secondary-pill"
-              onClick={() => refreshRecommendations()}
-              disabled={!imageFile || Boolean(busyState)}
-            >
-              <RefreshIcon />
-              Refresh Recommendations
-            </button>
-          }
-        />
+        <div className="generative-only-recommendations">
+          <RecommendationGrid
+            title="Recommended Hairstyles"
+            subtitle="AI suggestions tailored for you"
+            recommendations={recommendations}
+            selectedAssetId={selectedAssetId}
+            onSelect={handleSelect}
+            footer=""
+            mediaBasePath={SYSTEM_BASE_PATHS.staticAuto}
+            action={
+              <button
+                type="button"
+                className="secondary-pill"
+                onClick={() => refreshRecommendations()}
+                disabled={!imageFile || Boolean(busyState)}
+              >
+                <RefreshIcon />
+                Refresh Recommendations
+              </button>
+            }
+          />
+        </div>
       </div>
     </section>
   );
