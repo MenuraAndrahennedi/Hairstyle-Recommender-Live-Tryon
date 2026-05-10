@@ -733,6 +733,29 @@ button:disabled {
   gap: 1rem;
 }
 
+.generative-only-recommendations .recommendation-grid {
+  grid-template-columns: minmax(8rem, 9rem);
+  justify-content: center;
+}
+
+.generative-only-recommendations .style-card {
+  width: 100%;
+}
+
+.generative-only-recommendations .style-thumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.generative-only-recommendations .style-thumb .cover-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  padding: 0.45rem;
+}
+
 .compact-grid {
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
