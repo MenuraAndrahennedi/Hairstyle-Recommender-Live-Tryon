@@ -12,6 +12,10 @@ from generative_app.config import MODEL_CACHE_DIR
 
 
 DEFAULT_MODEL_ID = "runwayml/stable-diffusion-inpainting"
+DEFAULT_IP_ADAPTER_REPO = "h94/IP-Adapter"
+DEFAULT_IP_ADAPTER_SUBFOLDER = "models"
+DEFAULT_IP_ADAPTER_WEIGHT = "ip-adapter_sd15.bin"
+DEFAULT_IP_ADAPTER_SCALE = 0.85
 DEFAULT_NEGATIVE_PROMPT = (
     "low quality, blurry, deformed hairline, distorted face, extra face, duplicate face, "
     "bad anatomy, hat, wig cap, artifacts, cropped head, broken forehead, unrealistic hair"
@@ -72,6 +76,15 @@ def _prepare_inpaint_inputs(
     resized_mask = mask.resize((resized_width, resized_height), Image.Resampling.NEAREST)
     return resized_image, resized_mask, original_size
 
+def _load_reference_image_for_ip_adapter(reference_path: str | Path) -> Image.Image:
+    reference = Image.open(reference_path).convert("RGBA")
+
+    # IP-Adapter expects a normal RGB image.
+    # Your hairstyle assets may contain transparency, so place them on white background.
+    background = Image.new("RGBA", reference.size, (255, 255, 255, 255))
+    background.alpha_composite(reference)
+
+    return background.convert("RGB")
 
 def run_generative_inpaint(
     manifest_path: str | Path,
@@ -79,18 +92,28 @@ def run_generative_inpaint(
     output_name: str = "final_generated.png",
     num_inference_steps: int = 30,
     guidance_scale: float = 7.5,
-    strength: float = 0.99,
+    strength: float = 0.92,
     max_side: int = 768,
     extra_prompt: str | None = None,
     negative_prompt: str | None = DEFAULT_NEGATIVE_PROMPT,
+    use_ip_adapter: bool = True,
+    ip_adapter_scale: float = DEFAULT_IP_ADAPTER_SCALE,
 ) -> dict[str, Any]:
     manifest_path = Path(manifest_path)
     manifest = _load_manifest(manifest_path)
 
     subject = manifest["subject"]
+    reference = manifest.get("reference", {})
     generation = manifest.get("generation", {})
+
     subject_image_path = Path(subject["input_image_path"])
     mask_path = Path(subject["inpaint_mask_path"])
+
+    reference_image_path = reference.get("image_path")
+    reference_image = None
+
+    if use_ip_adapter and reference_image_path:
+        reference_image = _load_reference_image_for_ip_adapter(reference_image_path)
     if not mask_path.exists():
         raise FileNotFoundError(f"Inpaint mask not found: {mask_path}")
 
@@ -130,15 +153,29 @@ def run_generative_inpaint(
         pipe = pipe.to(device)
         pipe.enable_attention_slicing()
 
-    result = pipe(
-        prompt=prompt,
-        negative_prompt=negative_prompt,
-        image=image,
-        mask_image=mask,
-        num_inference_steps=num_inference_steps,
-        guidance_scale=guidance_scale,
-        strength=strength,
-    )
+    if use_ip_adapter and reference_image is not None:
+        pipe.load_ip_adapter(
+            DEFAULT_IP_ADAPTER_REPO,
+            subfolder=DEFAULT_IP_ADAPTER_SUBFOLDER,
+            weight_name=DEFAULT_IP_ADAPTER_WEIGHT,
+            cache_dir=str(MODEL_CACHE_DIR),
+        )
+        pipe.set_ip_adapter_scale(ip_adapter_scale)
+
+    pipe_kwargs = {
+        "prompt": prompt,
+        "negative_prompt": negative_prompt,
+        "image": image,
+        "mask_image": mask,
+        "num_inference_steps": num_inference_steps,
+        "guidance_scale": guidance_scale,
+        "strength": strength,
+    }
+
+    if use_ip_adapter and reference_image is not None:
+        pipe_kwargs["ip_adapter_image"] = reference_image
+
+    result = pipe(**pipe_kwargs)
 
     generated = result.images[0].resize(original_size, Image.Resampling.LANCZOS)
     output_path = manifest_path.parent / output_name
@@ -158,6 +195,11 @@ def run_generative_inpaint(
         "used_safetensors": used_safetensors,
         "prompt": prompt,
         "negative_prompt": negative_prompt,
+        "use_ip_adapter": use_ip_adapter,
+        "ip_adapter_repo": DEFAULT_IP_ADAPTER_REPO if use_ip_adapter else None,
+        "ip_adapter_weight": DEFAULT_IP_ADAPTER_WEIGHT if use_ip_adapter else None,
+        "ip_adapter_scale": ip_adapter_scale if use_ip_adapter else None,
+        "reference_image_path": str(reference_image_path) if reference_image_path else None,
     }
     metadata_path = manifest_path.parent / "final_generation_metadata.json"
     metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
