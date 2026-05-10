@@ -416,7 +416,7 @@ function UploadCard({
         <GenderToggle value={gender} onChange={onGenderChange} />
       </div>
 
-      {helper ? <p className="soft-note">{helper}</p> : null}
+      {helper ? <div className="soft-note">{helper}</div> : null}
     </section>
   );
 }
@@ -488,6 +488,7 @@ function ResultCard({
   subtitle,
   imageUrl,
   children,
+  emptyMessage = "Your result will appear here",
   downloadLabel = "Download Image",
   onDownload,
   extraActions,
@@ -508,14 +509,15 @@ function ResultCard({
         {imageUrl ? (
           <img src={imageUrl} alt={title} className="cover-image" />
         ) : (
-          <div className="empty-panel">Your result will appear here</div>
+          <div className="empty-panel">{emptyMessage}</div>
         )}
       </div>
 
       <div className="result-actions">
+        <div className="result-actions-right"></div>
         <button
           type="button"
-          className="primary-gradient"
+          className="button download-button"
           onClick={onDownload}
           disabled={!imageUrl}
         >
@@ -592,7 +594,7 @@ function StaticTryOnScreen() {
   }, []);
 
   async function runRecommendations(file, nextGender) {
-    setBusyState("Analyzing image and loading recommendations...");
+    setBusyState("Processing, please wait. This may take about 1 minute...");
     setError("");
     setPreparedResults({});
     const nextAnalysis = await analyzeFace(file, SYSTEM_BASE_PATHS.staticAuto);
@@ -614,7 +616,7 @@ function StaticTryOnScreen() {
       return;
     }
 
-    setBusyState("Preparing try-on results...");
+    setBusyState("Processing, please wait. This may take about 1 minute...");
     const generatedEntries = await Promise.all(
       nextRecommendations.map(async (item) => [
         item.asset_id,
@@ -631,10 +633,26 @@ function StaticTryOnScreen() {
     setRecommendations([]);
     setSelectedAssetId("");
     setPreparedResults({});
+    setBusyState("");
     setError("");
-    if (!file) return;
+
+    // Do not auto-run static try-on after upload.
+    // User must click "See Results".
+  }
+
+  async function handleSeeResults() {
+    if (!imageFile) {
+      setError("Please upload an image first.");
+      return;
+    }
+
+    setRecommendations([]);
+    setSelectedAssetId("");
+    setPreparedResults({});
+    setError("");
+
     try {
-      await runRecommendations(file, gender);
+      await runRecommendations(imageFile, gender);
     } catch (nextError) {
       setBusyState("");
       setError(
@@ -743,29 +761,16 @@ function StaticTryOnScreen() {
           onClear={() => handleFileChange(null)}
           onGenderChange={handleGenderChange}
           uploadLabel={imageFile ? "Change Photo" : "Upload Photo"}
-        />
-
-        <div className="live-debug-panel">
-          <p>
-            <strong>Selected:</strong> {selectedAssetId || "None"}
-          </p>
-          <p>
-            <strong>Recommendations:</strong> {recommendations.length}
-          </p>
-          <p>
-            <strong>Status:</strong>{" "}
-            {wsConnected ? "Connected" : "Disconnected"}
-          </p>
-        </div>
-
-        <RecommendationGrid
-          title="Recommended Hairstyles"
-          subtitle="AI-generated styles for you"
-          recommendations={recommendations}
-          selectedAssetId={selectedAssetId}
-          onSelect={handleSelect}
-          footer="Click a hairstyle to see the try-on result"
-          mediaBasePath={SYSTEM_BASE_PATHS.staticAuto}
+          helper={
+            <button
+              type="button"
+              className="primary-gradient see-results"
+              onClick={handleSeeResults}
+              disabled={!imageFile || Boolean(busyState)}
+            >
+              See Results
+            </button>
+          }
         />
 
         <ResultCard
@@ -775,6 +780,13 @@ function StaticTryOnScreen() {
             result?.output_image_url,
             SYSTEM_BASE_PATHS.staticAuto,
           )}
+          emptyMessage={
+            busyState
+              ? "Processing, please wait. This may take about 1 minute..."
+              : imageFile
+                ? "Click See Results to generate your static try-on."
+                : "Upload an image to begin."
+          }
           onDownload={() =>
             downloadFile(
               resolveMediaUrl(
@@ -784,6 +796,15 @@ function StaticTryOnScreen() {
               `${selectedAssetId || "static-tryon"}.png`,
             )
           }
+        />
+        <RecommendationGrid
+          title="Recommended Hairstyles"
+          subtitle="AI-generated styles for you"
+          recommendations={busyState ? [] : recommendations}
+          selectedAssetId={selectedAssetId}
+          onSelect={handleSelect}
+          footer="Click a hairstyle to see the try-on result"
+          mediaBasePath={SYSTEM_BASE_PATHS.staticAuto}
         />
       </div>
     </section>

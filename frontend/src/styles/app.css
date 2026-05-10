@@ -59,6 +59,40 @@ button:disabled {
   cursor: not-allowed;
 }
 
+.see-results {
+  width: 100%;
+  justify-content: center;
+  margin-top: 0.75rem;
+}
+
+.download-button {
+  background: #ffffff;
+  color: #1b2354;
+  border: 1px solid rgba(27, 35, 84, 0.12);
+  box-shadow: none;
+  padding: 0.75rem 1rem;
+  min-width: unset;
+  width: fit-content;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  min-height: 3.35rem;
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.download-button:hover {
+  background: #f5f5f7;
+}
+
+.result-actions-right {
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
+}
+
 .app-shell {
   position: relative;
   min-height: 100vh;
