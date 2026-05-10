@@ -100,6 +100,22 @@ button:disabled {
   padding: 1rem 1rem 3rem;
 }
 
+.app-shell {
+  background-image:
+    linear-gradient(
+      to right,
+      rgba(245, 247, 255, 0),
+      rgb(253, 235, 255),
+      rgba(255, 255, 255, 0)
+    ),
+    url("../assets/backgrounds/home-bg.jpg");
+
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
 .ambient,
 .ambient-grid {
   pointer-events: none;
@@ -205,12 +221,9 @@ button:disabled {
   box-shadow: 0 12px 30px rgba(104, 86, 228, 0.35);
 }
 
-.brand-mark-core {
-  width: 1.75rem;
-  height: 2.2rem;
-  border-radius: 60% 40% 58% 42%;
-  background: rgba(255, 255, 255, 0.94);
-  transform: rotate(-16deg);
+.brand-mark-img {
+  width: 3rem;
+  height: 3.2rem;
 }
 
 .brand-copy {
@@ -238,13 +251,12 @@ button:disabled {
 .nav {
   display: flex;
   align-items: center;
-  gap: 0.8rem;
+  gap: 0rem;
 }
 
 .nav-link {
   position: relative;
-  min-width: 8.5rem;
-  padding: 0.95rem 0.8rem;
+  padding: 0.95rem 1.5rem;
   border-radius: 999px;
   color: #2a2f4f;
   background: transparent;
@@ -265,6 +277,18 @@ button:disabled {
   border-radius: 999px;
   background: linear-gradient(90deg, #6b54ff, #9661ff);
   transform: translateX(-50%);
+}
+
+.github-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.github-nav-icon {
+  width: 1.8rem;
+  height: 1.8rem;
+  object-fit: contain;
 }
 
 .page {
@@ -387,8 +411,8 @@ button:disabled {
 }
 
 .icon {
-  width: 1.65rem;
-  height: 1.65rem;
+  width: 3rem;
+  height: 3rem;
   fill: currentColor;
 }
 
