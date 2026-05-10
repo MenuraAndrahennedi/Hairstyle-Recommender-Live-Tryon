@@ -799,7 +799,6 @@ function StaticTryOnScreen() {
         />
         <RecommendationGrid
           title="Recommended Hairstyles"
-          subtitle="AI-generated styles for you"
           recommendations={busyState ? [] : recommendations}
           selectedAssetId={selectedAssetId}
           onSelect={handleSelect}
