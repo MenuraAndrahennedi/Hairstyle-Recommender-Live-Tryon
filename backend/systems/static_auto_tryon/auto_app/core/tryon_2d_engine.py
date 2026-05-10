@@ -20,6 +20,11 @@ TRYON_CLEAN_ASSET_ROOT = PROJECT_ROOT / "backend" / "data" / "processed" / "cele
 TRYON_CLEAN_IMAGE_DIR = TRYON_CLEAN_ASSET_ROOT / "images"
 TRYON_CLEAN_MASK_DIR = TRYON_CLEAN_ASSET_ROOT / "masks"
 
+LIVE_STATIC_HAIR_WIDTH_SCALE = 1.35
+LIVE_STATIC_HAIR_Y_OFFSET = 0.50
+LIVE_STATIC_ROTATION_STRENGTH = 0.4
+LIVE_STATIC_OVERLAY_CANVAS_PADDING = 300
+
 
 def _tryon_clean_asset_paths(asset: AssetMetadata) -> tuple[Path, Path]:
     image_name = Path(asset.image_path).name
@@ -1969,6 +1974,321 @@ def _render_subject_silhouette_texture_tryon(
     composed.alpha_composite(overlay_only)
     return composed
 
+def _cv2_rotate_rgba(hair_rgb: np.ndarray, hair_alpha: np.ndarray, angle: float) -> tuple[np.ndarray, np.ndarray]:
+    height, width = hair_rgb.shape[:2]
+    rgba = np.dstack([hair_rgb, (hair_alpha * 255).astype(np.uint8)])
+
+    center = (width // 2, height // 2)
+    matrix = cv2.getRotationMatrix2D(center, angle, 1.0)
+
+    cos = abs(matrix[0, 0])
+    sin = abs(matrix[0, 1])
+    new_width = int((height * sin) + (width * cos))
+    new_height = int((height * cos) + (width * sin))
+
+    matrix[0, 2] += (new_width / 2) - center[0]
+    matrix[1, 2] += (new_height / 2) - center[1]
+
+    rotated = cv2.warpAffine(
+        rgba,
+        matrix,
+        (new_width, new_height),
+        flags=cv2.INTER_LINEAR,
+        borderMode=cv2.BORDER_CONSTANT,
+        borderValue=(0, 0, 0, 0),
+    )
+    return rotated[:, :, :3], rotated[:, :, 3].astype("float32") / 255.0
+
+
+def _cv2_overlay_hair(frame: np.ndarray, hair_rgb: np.ndarray, hair_alpha: np.ndarray, x1: float, y1: float) -> np.ndarray:
+    height, width = frame.shape[:2]
+    x1 = int(x1)
+    y1 = int(y1)
+
+    hair_height, hair_width = hair_rgb.shape[:2]
+    x2 = x1 + hair_width
+    y2 = y1 + hair_height
+
+    if x1 < 0:
+        hair_rgb = hair_rgb[:, -x1:]
+        hair_alpha = hair_alpha[:, -x1:]
+        x1 = 0
+    if y1 < 0:
+        hair_rgb = hair_rgb[-y1:, :]
+        hair_alpha = hair_alpha[-y1:, :]
+        y1 = 0
+    if x2 > width:
+        cut = x2 - width
+        hair_rgb = hair_rgb[:, :-cut]
+        hair_alpha = hair_alpha[:, :-cut]
+        x2 = width
+    if y2 > height:
+        cut = y2 - height
+        hair_rgb = hair_rgb[:-cut, :]
+        hair_alpha = hair_alpha[:-cut, :]
+        y2 = height
+
+    if hair_rgb.size == 0 or hair_alpha.size == 0:
+        return frame
+
+    roi = frame[y1:y2, x1:x2]
+    if roi.shape[:2] != hair_alpha.shape[:2]:
+        return frame
+
+    alpha = cv2.GaussianBlur(hair_alpha, (15, 15), 0)
+    alpha = np.clip(alpha, 0, 1)
+
+    for channel in range(3):
+        roi[:, :, channel] = (
+            hair_alpha * hair_rgb[:, :, channel]
+            + (1 - alpha) * roi[:, :, channel]
+        )
+
+    frame[y1:y2, x1:x2] = roi
+    return frame
+
+
+def _cv2_overlay_hair_on_extended_canvas(frame: np.ndarray, hair_rgb: np.ndarray, hair_alpha: np.ndarray, x1: float, y1: float) -> np.ndarray:
+    pad = LIVE_STATIC_OVERLAY_CANVAS_PADDING
+    extended = cv2.copyMakeBorder(
+        frame,
+        pad,
+        pad,
+        pad,
+        pad,
+        cv2.BORDER_CONSTANT,
+        value=(255, 255, 255),
+    )
+    extended = _cv2_overlay_hair(extended, hair_rgb, hair_alpha, x1 + pad, y1 + pad)
+    height, width = frame.shape[:2]
+    return extended[pad : pad + height, pad : pad + width]
+
+
+def _detect_background_color(frame: np.ndarray) -> tuple[int, int, int]:
+    h, w = frame.shape[:2]
+
+    border = 20
+
+    samples = np.concatenate([
+        frame[:border, :, :].reshape(-1, 3),
+        frame[-border:, :, :].reshape(-1, 3),
+        frame[:, :border, :].reshape(-1, 3),
+        frame[:, -border:, :].reshape(-1, 3),
+    ], axis=0)
+
+    if samples.size == 0:
+        return (255, 255, 255)
+
+    color = np.median(samples, axis=0)
+
+    return (
+        int(color[0]),
+        int(color[1]),
+        int(color[2]),
+    )
+
+
+def _cv2_suppress_original_hair(
+    frame: np.ndarray,
+    subject_hair_mask: Image.Image | None,
+    face_analysis: FaceAnalysisResult | None = None,
+) -> np.ndarray:
+
+    if subject_hair_mask is None:
+        return frame
+
+    h, w = frame.shape[:2]
+
+    mask = subject_hair_mask.convert("L").resize((w, h), Image.Resampling.NEAREST)
+    mask_array = (np.asarray(mask, dtype=np.uint8) > 0).astype(np.uint8)
+
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (17, 17))
+    mask_array = cv2.dilate(mask_array, kernel, iterations=1)
+
+    head_keep_mask = np.zeros((h, w), dtype=np.uint8)
+
+    # Build head region using mediapipe landmarks
+    if face_analysis is not None and face_analysis.landmarks:
+
+        lm = face_analysis.landmarks
+
+        forehead_y = int(lm[10].y * h)
+
+        left_x = int(lm[234].x * w)
+        right_x = int(lm[454].x * w)
+
+        top_y = max(int(forehead_y - h * 0.05), 0)
+        bottom_y = int(forehead_y + h * 0.10)
+
+        margin_x = int(w * 0.05)
+
+        left_x = max(left_x - margin_x, 0)
+        right_x = min(right_x + margin_x, w - 1)
+
+        center_x = int((left_x + right_x) / 2)
+        center_y = int((top_y + bottom_y) / 2)
+
+        axis_x = int((right_x - left_x) / 2)
+        axis_y = int((bottom_y - top_y) / 2)
+
+        cv2.ellipse(
+            head_keep_mask,
+            (center_x, center_y),
+            (axis_x, axis_y),
+            0,
+            0,
+            360,
+            1,
+            -1,
+        )
+
+    # Split regions
+    # Only top-head region should use skin-color inpaint
+    top_head_mask = np.zeros((h, w), dtype=np.uint8)
+
+    if face_analysis is not None and face_analysis.landmarks:
+
+        lm = face_analysis.landmarks
+
+        forehead_y = int(lm[10].y * h)
+
+        left_x = int(lm[234].x * w)
+        right_x = int(lm[454].x * w)
+
+        # restrict ONLY upper forehead/head
+        top_y = max(int(forehead_y - h * 0.06), 0)
+        bottom_y = min(int(forehead_y + h * 0.03), h - 1)
+
+        cv2.rectangle(
+            top_head_mask,
+            (left_x, top_y),
+            (right_x, bottom_y),
+            1,
+            -1,
+        )
+
+    # ONLY forehead/head region gets skin-color
+    inpaint_mask = mask_array * top_head_mask
+
+    # everything else becomes background color
+    bg_mask = mask_array * (1 - top_head_mask)
+
+    result = frame.copy()
+
+    # Skin-like forehead cleanup
+    if np.any(inpaint_mask):
+        result = cv2.inpaint(
+            result,
+            (inpaint_mask * 255).astype(np.uint8),
+            9,
+            cv2.INPAINT_TELEA,
+        )
+
+    # Background replacement for outer hair
+    bg_color = _detect_background_color(frame)
+
+    result[bg_mask > 0] = bg_color
+
+    return result
+
+
+def _face_angle_from_landmarks(landmarks: list[FaceLandmark], width: int, height: int) -> float:
+    left_eye = (int(landmarks[33].x * width), int(landmarks[33].y * height))
+    right_eye = (int(landmarks[263].x * width), int(landmarks[263].y * height))
+    dx = right_eye[0] - left_eye[0]
+    dy = right_eye[1] - left_eye[1]
+    return math.degrees(math.atan2(dy, dx))
+
+
+def render_static_live2d_tryon_image(
+    input_image_path: str | Path | Image.Image,
+    face_analysis: FaceAnalysisResult,
+    asset: AssetMetadata,
+    subject_hair_mask: Image.Image | None = None,
+    layout_hint: dict[str, dict[str, int] | None] | None = None,
+) -> Image.Image | None:
+    """Static try-on using the same placement logic as the working live 2D engine.
+
+    Segmentation is used only to suppress/remove the user's original hair.
+    It is NOT used for sizing or positioning the new hair asset.
+    """
+    if not face_analysis.face_detected or not face_analysis.face_bbox or not face_analysis.landmarks:
+        return None
+
+    if isinstance(input_image_path, Image.Image):
+        input_pil = input_image_path.convert("RGB")
+    else:
+        input_pil = Image.open(Path(input_image_path)).convert("RGB")
+
+    # PIL RGB -> OpenCV BGR, same frame format as live_2d.
+    frame = cv2.cvtColor(np.asarray(input_pil), cv2.COLOR_RGB2BGR)
+    height, width = frame.shape[:2]
+
+    cleaned_mask = _largest_subject_hair_component(subject_hair_mask)
+    frame = _cv2_suppress_original_hair(frame, cleaned_mask, face_analysis)
+
+    asset_image_path, asset_mask_path = _resolve_tryon_asset_paths(asset, prefer_clean_variant=True)
+    hair_bgr = cv2.imread(str(asset_image_path), cv2.IMREAD_COLOR)
+    hair_mask = cv2.imread(str(asset_mask_path), cv2.IMREAD_GRAYSCALE)
+    if hair_bgr is None or hair_mask is None:
+        return None
+
+    hair_alpha = hair_mask.astype("float32") / 255.0
+
+    landmarks = face_analysis.landmarks
+    face_bbox = face_analysis.face_bbox
+    x_min = face_bbox["x"]
+    x_max = face_bbox["x"] + face_bbox["width"]
+    face_width = max(face_bbox["width"], 1)
+
+    forehead_y = int((landmarks[10].y + landmarks[151].y) / 2 * height)
+    center_x = int((x_min + x_max) / 2)
+
+    head_width = face_width * 1.15
+    target_width = int(head_width * LIVE_STATIC_HAIR_WIDTH_SCALE)
+    scale = target_width / max(hair_bgr.shape[1], 1)
+
+    new_width = max(int(hair_bgr.shape[1] * scale), 1)
+    new_height = max(int(hair_bgr.shape[0] * scale), 1)
+    hair_bgr = cv2.resize(hair_bgr, (new_width, new_height), interpolation=cv2.INTER_LINEAR)
+    hair_alpha = cv2.resize(hair_alpha, (new_width, new_height), interpolation=cv2.INTER_LINEAR)
+
+    raw_angle = _face_angle_from_landmarks(landmarks, width, height) * LIVE_STATIC_ROTATION_STRENGTH
+    rotated_bgr, rotated_alpha = _cv2_rotate_rgba(hair_bgr, hair_alpha, -raw_angle)
+
+    rotated_height, rotated_width = rotated_bgr.shape[:2]
+    x1 = center_x - rotated_width // 2
+    y1 = forehead_y - int(LIVE_STATIC_HAIR_Y_OFFSET * rotated_height)
+
+    frame = _cv2_overlay_hair_on_extended_canvas(frame, rotated_bgr, rotated_alpha, x1, y1)
+
+    output_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    return Image.fromarray(output_rgb).convert("RGBA")
+
+
+def render_static_live2d_tryon(
+    input_image_path: str | Path | Image.Image,
+    face_analysis: FaceAnalysisResult,
+    asset: AssetMetadata,
+    subject_hair_mask: Image.Image | None = None,
+    layout_hint: dict[str, dict[str, int] | None] | None = None,
+) -> str | None:
+    composed = render_static_live2d_tryon_image(
+        input_image_path,
+        face_analysis,
+        asset,
+        subject_hair_mask=subject_hair_mask,
+        layout_hint=layout_hint,
+    )
+    if composed is None:
+        return None
+
+    input_stem = "static_frame" if isinstance(input_image_path, Image.Image) else Path(input_image_path).stem
+    TRYON_DIR.mkdir(parents=True, exist_ok=True)
+    output_name = f"{input_stem}_{asset.asset_id}_{uuid4().hex[:8]}.png"
+    output_path = TRYON_DIR / output_name
+    composed.convert("RGB").save(output_path)
+    return str(output_path)
 
 def render_legacy_static_tryon_image(
     input_image_path: str | Path | Image.Image,
@@ -2316,6 +2636,6 @@ def render_static_texture_tryon(
     return str(output_path)
 
 
-render_static_tryon_image = render_legacy_static_tryon_image
-render_static_tryon = render_legacy_static_tryon
+render_static_tryon_image = render_static_live2d_tryon_image
+render_static_tryon = render_static_live2d_tryon
 
