@@ -10,9 +10,7 @@
   "gender_label": "female",
   "quality_score": 1.0,
   "confidence_bucket": "high",
-  "quality_flags": [
-    "usable_candidate"
-  ],
+  "quality_flags": ["usable_candidate"],
   "hair_mask_stats": {
     "positive_pixels": 9106,
     "coverage_ratio": 0.234667,
@@ -46,11 +44,7 @@
     "height": 174
   },
   "celeba_attribute_hints": {
-    "positive_fields": [
-      "Bangs",
-      "Gray_Hair",
-      "Wavy_Hair"
-    ],
+    "positive_fields": ["Bangs", "Gray_Hair", "Wavy_Hair"],
     "color_hint": "Gray_Hair",
     "texture_hint": "Wavy_Hair",
     "bangs_hint": true,
@@ -72,8 +66,6 @@
     "notes": ""
   },
   "full_hair_score": 1.0,
-  "full_hair_flags": [
-    "full_hair_candidate"
-  ],
+  "full_hair_flags": ["full_hair_candidate"],
   "full_hair_candidate": true
 }
