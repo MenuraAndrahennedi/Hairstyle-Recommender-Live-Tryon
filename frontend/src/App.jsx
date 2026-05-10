@@ -1,3 +1,10 @@
+import logoIcon from "./assets/icons/logo.png";
+import sparkleIcon from "./assets/icons/sparkle.png";
+import photoIcon from "./assets/icons/photo.png";
+import cameraIcon from "./assets/icons/camera.png";
+import globeIcon from "./assets/icons/globe.png";
+import githubIcon from "./assets/icons/github.png";
+
 import { useEffect, useRef, useState } from "react";
 import {
   SYSTEM_BASE_PATHS,
@@ -61,41 +68,25 @@ const CONTACT_POINTS = [
 function LogoMark() {
   return (
     <div className="brand-mark" aria-hidden="true">
-      <span className="brand-mark-core" />
+      <img src={logoIcon} alt="" className="brand-mark-img" />
     </div>
   );
 }
 
 function SparkleIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="icon" aria-hidden="true">
-      <path d="M12 2l1.8 5.2L19 9l-5.2 1.8L12 16l-1.8-5.2L5 9l5.2-1.8L12 2zM18.5 14l.9 2.6 2.6.9-2.6.9-.9 2.6-.9-2.6-2.6-.9 2.6-.9.9-2.6z" />
-    </svg>
-  );
+  return <img src={sparkleIcon} alt="" className="icon" aria-hidden="true" />;
 }
 
 function PhotoIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="icon" aria-hidden="true">
-      <path d="M4 5h16a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V7a2 2 0 012-2zm0 2v10h16V7H4zm3 8l3-4 2.4 3 1.8-2.2L18 15H7zm2-6.2A1.8 1.8 0 1110.8 7 1.8 1.8 0 019 8.8z" />
-    </svg>
-  );
+  return <img src={photoIcon} alt="" className="icon" aria-hidden="true" />;
 }
 
 function CameraIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="icon" aria-hidden="true">
-      <path d="M12 5a7 7 0 017 7v5a2 2 0 01-2 2H7a2 2 0 01-2-2v-5a7 7 0 017-7zm0 2a5 5 0 00-5 5v5h10v-5a5 5 0 00-5-5zm0-5l2.5 2.5h-5L12 2z" />
-    </svg>
-  );
+  return <img src={cameraIcon} alt="" className="icon" aria-hidden="true" />;
 }
 
 function GlobeIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="icon" aria-hidden="true">
-      <path d="M12 2a10 10 0 100 20 10 10 0 000-20zm6.9 9h-3.2a15.3 15.3 0 00-1.4-5A8 8 0 0118.9 11zM12 4c1 1.2 1.9 3.8 2 7h-4c.1-3.2 1-5.8 2-7zM5.1 13h3.2a15.3 15.3 0 001.4 5A8 8 0 015.1 13zm0-2A8 8 0 019.7 6a15.3 15.3 0 00-1.4 5H5.1zm6.9 9c-1-1.2-1.9-3.8-2-7h4c-.1 3.2-1 5.8-2 7zm2.3-2a15.3 15.3 0 001.4-5h3.2a8 8 0 01-4.6 5z" />
-    </svg>
-  );
+  return <img src={globeIcon} alt="" className="icon" aria-hidden="true" />;
 }
 
 function UploadIcon() {
@@ -193,9 +184,6 @@ function useObjectUrl(file) {
 }
 
 function TopNavigation({ currentView, onNavigate }) {
-  const activeNav =
-    currentView === "about" || currentView === "contact" ? currentView : "home";
-
   return (
     <header className="topbar">
       <button
@@ -213,24 +201,69 @@ function TopNavigation({ currentView, onNavigate }) {
       <nav className="nav">
         <button
           type="button"
-          className={`nav-link ${activeNav === "home" ? "active" : ""}`}
+          className={`nav-link ${currentView === "home" ? "active" : ""}`}
           onClick={() => onNavigate("home")}
         >
           Home
         </button>
+
         <button
           type="button"
-          className={`nav-link ${activeNav === "about" ? "active" : ""}`}
-          onClick={() => onNavigate("about")}
+          className={`nav-link ${currentView === "static" ? "active" : ""}`}
+          onClick={() => onNavigate("static")}
         >
-          About Us
+          Static
         </button>
+
         <button
           type="button"
-          className={`nav-link ${activeNav === "contact" ? "active" : ""}`}
-          onClick={() => onNavigate("contact")}
+          className={`nav-link ${currentView === "generative" ? "active" : ""}`}
+          onClick={() => onNavigate("generative")}
         >
-          Contact Us
+          Generative
+        </button>
+
+        <button
+          type="button"
+          className={`nav-link ${currentView === "live2d" ? "active" : ""}`}
+          onClick={() => onNavigate("live2d")}
+        >
+          Live 2D
+        </button>
+
+        <button
+          type="button"
+          className={`nav-link ${currentView === "live3d" ? "active" : ""}`}
+          onClick={() => onNavigate("live3d")}
+        >
+          Live 3D
+        </button>
+
+        <button
+          type="button"
+          className={`nav-link ${currentView === "report" ? "active" : ""}`}
+          onClick={() =>
+            window.open(
+              "https://drive.google.com/file/d/1Ly40Is_pu0PfPSc7sEYiTi4KvmAhCVfB/view?usp=sharing",
+              "_blank",
+            )
+          }
+        >
+          Project Report
+        </button>
+
+        <button
+          type="button"
+          className="nav-link github-nav-link"
+          onClick={() =>
+            window.open(
+              "https://github.com/MenuraAndrahennedi/Hairstyle-Recommender-Live-Tryon",
+              "_blank",
+            )
+          }
+        >
+          <img src={githubIcon} alt="" className="github-nav-icon" />
+          GitHub
         </button>
       </nav>
     </header>
@@ -238,15 +271,7 @@ function TopNavigation({ currentView, onNavigate }) {
 }
 
 function SceneBackdrop() {
-  return (
-    <>
-      <div className="ambient ambient-left-top" />
-      <div className="ambient ambient-left-bottom" />
-      <div className="ambient ambient-right-top" />
-      <div className="ambient ambient-right-bottom" />
-      <div className="ambient-grid" />
-    </>
-  );
+  return <></>;
 }
 
 function SystemCard({ card, onOpen }) {
@@ -1453,16 +1478,6 @@ function Live2DTryOnScreen() {
 
   return (
     <section className="page live-page">
-      <div className="page-head live-head">
-        <div className="headline-with-icon">
-          <div className="headline-icon">
-            <CameraIcon />
-          </div>
-          <h1>Live 2D Tryon</h1>
-        </div>
-        <p>See hairstyles on you in real-time using your webcam.</p>
-      </div>
-
       <StatusBanner
         state={
           isRefreshing
@@ -1755,7 +1770,7 @@ function App() {
   }
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell`}>
       <SceneBackdrop />
       <TopNavigation currentView={currentView} onNavigate={setCurrentView} />
 
