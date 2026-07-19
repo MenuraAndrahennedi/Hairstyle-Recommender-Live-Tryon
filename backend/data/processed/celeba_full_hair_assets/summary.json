@@ -1,6 +1,6 @@
 {
   "source_dataset": "celeba_full_hair",
-  "asset_root": "D:\\Projects\\Personal Projects\\Hairstyle Recommender Live Tryon\\backend\\data\\processed\\celeba_full_hair_assets",
+  "asset_root": "backend/data/processed/celeba_full_hair_assets",
   "total_assets": 209,
   "lightweight_mode": false,
   "partition_counts": {

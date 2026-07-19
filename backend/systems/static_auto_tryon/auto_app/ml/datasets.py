@@ -9,7 +9,7 @@ from typing import Callable, Iterable
 
 from PIL import Image
 
-from auto_app.config import PROJECT_ROOT
+from auto_app.config import PROJECT_ROOT, resolve_project_path
 from auto_app.ml.khairstyle_translation import build_normalized_attributes, translate_labels
 
 try:
@@ -92,10 +92,7 @@ def _project_relative(path: Path) -> str:
 
 
 def _resolve_project_path(path: str | Path) -> Path:
-    candidate = Path(path)
-    if candidate.is_absolute():
-        return candidate
-    return PROJECT_ROOT / candidate
+    return resolve_project_path(path)
 
 
 def write_jsonl_manifest(records: Iterable[dict[str, object]], output_path: str | Path) -> Path:

@@ -74,38 +74,27 @@ npm run dev
 
 - `backend/app`
   Gateway backend that mounts all subsystems under one FastAPI app.
-
 - `backend/systems/static_auto_tryon`
   Static automatic pipeline: upload image, detect face, segment hair, recommend hairstyles, and render 2D try-on outputs.
-
 - `backend/systems/generative_tryon`
   Generative workflow: uses the same recommendation and segmentation pipeline to prepare reference packages and generate edited hairstyle outputs.
-
 - `backend/systems/live_2d`
   Webcam-based live 2D try-on system using MediaPipe face tracking plus the project’s own recommendation, segmentation, and hair assets.
-
 - `backend/systems/live_3d`
   Reserved for future live 3D work.
-
 - `backend/models`
   Shared trained model store for the whole project.
   Includes face attribute, hair segmentation, mapper, hairstyle attribute, and MediaPipe face landmarker assets.
-
 - `backend/data/raw`
   Original source datasets kept for preprocessing and reproducibility.
-
 - `backend/data/datasets`
   Training-ready datasets and manifests created from the raw data.
-
 - `backend/data/processed`
   Processed asset banks used by the running systems.
-
 - `backend/outputs`
   Runtime outputs such as uploads, predictions, static try-on results, and generative package outputs.
-
 - `notebooks`
   End-to-end research, preprocessing, dataset creation, training, evaluation, and try-on experiment notebooks.
-
 - `frontend`
   Vite + React frontend with a single home page for the available systems.
 
@@ -191,10 +180,8 @@ How systems use them:
 
 - Static Auto Try-On:
   recommends from the reviewed render-safe asset bank and renders with `tryon_clean` when available.
-
 - Generative Try-On:
   uses the same reviewed asset bank and `tryon_clean` assets as reference inputs for generation.
-
 - Live 2D:
   uses the same recommendation pipeline and overlays `tryon_clean` assets in real time.
 
@@ -204,16 +191,12 @@ Shared under `backend/models`:
 
 - `celeba_face_basic/face_attribute_model.pt`
   Predicts face attributes used for recommendation.
-
 - `hair_segmentation/v2_unet_product.pt`
   Segments the subject hair region.
-
 - `reviewed_hairstyle_basic/basic_attribute_model.pt`
   Hairstyle attribute model used in data/model workflows.
-
 - `face_to_hair_mapper_light/mapper_config.json`
   Maps face attributes to likely hairstyle attributes for recommendation.
-
 - `face_landmarker.task`
   MediaPipe model used for landmark detection, especially in live 2D.
 
@@ -221,28 +204,20 @@ Shared under `backend/models`:
 
 - `FastAPI`
   Backend APIs and subsystem gateway.
-
 - `React + Vite`
   Frontend UI.
-
 - `PyTorch`
   Training and inference for the project’s segmentation and attribute models.
-
 - `MediaPipe`
   Face landmark detection and geometry estimation, especially for live 2D tracking.
-
 - `OpenCV`
   Webcam capture and real-time image compositing.
-
 - `Pillow`
   Image loading, masking, cleaning, and asset preparation.
-
 - `NumPy`
   Image and mask array operations.
-
 - `Diffusers`, `Transformers`, `Accelerate`
   Generative try-on pipeline and inpainting workflow.
-
 - `Pandas`
   Dataset preparation, metadata processing, and notebook analysis.
 

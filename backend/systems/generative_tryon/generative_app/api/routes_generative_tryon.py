@@ -68,9 +68,8 @@ async def generate_generative_tryon_package(
             final_generation = run_generative_inpaint(
                 package["manifest_path"],
                 extra_prompt=(
-                    "Use the selected reference hairstyle image as the main guide. "
-                    "Match its silhouette, hair flow, front shape, side volume, color, and texture. "
-                    "Do not invent a different hairstyle. Preserve the person's face, skin, clothing, and background."
+                    "Match the reference hairstyle shape, volume, color, and texture. "
+                    "Keep the person clothed and edit only the hair."
                 ),
                 use_ip_adapter=True,
                 ip_adapter_scale=0.85,

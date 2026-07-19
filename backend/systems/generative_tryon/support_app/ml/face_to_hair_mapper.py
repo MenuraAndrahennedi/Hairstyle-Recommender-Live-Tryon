@@ -9,7 +9,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Iterable
 
-from support_app.config import PROJECT_ROOT
+from support_app.config import PROJECT_ROOT, resolve_project_path
 from support_app.ml.datasets import read_jsonl_manifest, write_jsonl_manifest
 
 try:
@@ -47,10 +47,7 @@ def _ensure_torch() -> None:
 
 
 def _resolve_project_path(path: str | Path) -> Path:
-    candidate = Path(path)
-    if candidate.is_absolute():
-        return candidate
-    return PROJECT_ROOT / candidate
+    return resolve_project_path(path)
 
 
 def load_celeba_attribute_rows(raw_celeba_root: str | Path | None = None) -> dict[str, dict[str, int]]:

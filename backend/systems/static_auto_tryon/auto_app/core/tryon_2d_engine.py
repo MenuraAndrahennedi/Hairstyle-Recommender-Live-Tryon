@@ -8,12 +8,12 @@ import cv2
 import numpy as np
 from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
-from auto_app.config import PROJECT_ROOT, TRYON_DIR
+from auto_app.config import PROJECT_ROOT, TRYON_DIR, resolve_project_path
 from auto_app.models.schemas import AssetMetadata, FaceAnalysisResult, FaceLandmark
 
 
 def _resolve_project_path(relative_path: str) -> Path:
-    return PROJECT_ROOT / relative_path
+    return resolve_project_path(relative_path)
 
 
 TRYON_CLEAN_ASSET_ROOT = PROJECT_ROOT / "backend" / "data" / "processed" / "celeba_full_hair_assets" / "tryon_clean"

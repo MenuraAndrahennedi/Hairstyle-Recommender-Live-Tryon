@@ -576,16 +576,7 @@ function formatAssetName(assetId, attrs) {
 }
 
 function chooseGenerativeImageUrl(result) {
-  return (
-    resolveMediaUrl(result?.final_image_url, SYSTEM_BASE_PATHS.generative) ||
-    resolveMediaUrl(result?.preview_url, SYSTEM_BASE_PATHS.generative) ||
-    resolveMediaUrl(
-      result?.reference_image_url,
-      SYSTEM_BASE_PATHS.generative,
-    ) ||
-    resolveMediaUrl(result?.input_image_url, SYSTEM_BASE_PATHS.generative) ||
-    ""
-  );
+  return resolveMediaUrl(result?.final_image_url, SYSTEM_BASE_PATHS.generative);
 }
 
 function StaticTryOnScreen() {
@@ -1017,7 +1008,7 @@ function GenerativeTryOnScreen() {
   const generativeMessage = result?.final_generation_completed
     ? "Final generative result created successfully."
     : result?.final_generation_error
-      ? `Final generation failed, showing prototype preview instead. ${result.final_generation_error}`
+      ? `Final generation failed before producing a final image. ${result.final_generation_error}`
       : result?.message || busyState;
 
   return (
@@ -1062,9 +1053,11 @@ function GenerativeTryOnScreen() {
           emptyMessage={
             busyState
               ? "Processing, please wait. This may take about 10 minute..."
-              : imageFile
-                ? "Click See Results to generate your generative try-on."
-                : "Upload an image to begin."
+              : result?.final_generation_error
+                ? "Final image was not created. Check the error above, then try again."
+                : imageFile
+                  ? "Click See Results to generate your final generative try-on."
+                  : "Upload an image to begin."
           }
           onDownload={() =>
             downloadFile(

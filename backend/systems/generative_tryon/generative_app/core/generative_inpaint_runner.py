@@ -8,7 +8,7 @@ from typing import Any
 
 from PIL import Image
 
-from generative_app.config import MODEL_CACHE_DIR
+from generative_app.config import MODEL_CACHE_DIR, resolve_project_path
 
 
 DEFAULT_MODEL_ID = "runwayml/stable-diffusion-inpainting"
@@ -18,12 +18,13 @@ DEFAULT_IP_ADAPTER_WEIGHT = "ip-adapter_sd15.bin"
 DEFAULT_IP_ADAPTER_SCALE = 0.85
 DEFAULT_NEGATIVE_PROMPT = (
     "low quality, blurry, deformed hairline, distorted face, extra face, duplicate face, "
-    "bad anatomy, hat, wig cap, artifacts, cropped head, broken forehead, unrealistic hair"
+    "bad anatomy, hat, wig cap, artifacts, cropped head, broken forehead, unrealistic hair, "
+    "nudity, nude body, bare chest, explicit, nsfw"
 )
 
 
 def _load_manifest(manifest_path: str | Path) -> dict[str, Any]:
-    return json.loads(Path(manifest_path).read_text(encoding="utf-8"))
+    return json.loads(resolve_project_path(manifest_path).read_text(encoding="utf-8"))
 
 
 def _build_runtime_prompt(
@@ -33,13 +34,13 @@ def _build_runtime_prompt(
     reference = manifest.get("reference", {})
     attrs = reference.get("normalized_attributes", {})
     base_prompt = (
-        "Photorealistic portrait of the same person. "
-        "Preserve face identity, skin tone, pose, clothing, and background. "
-        "Edit only the hair and hairline. "
+        "Photorealistic clothed headshot. "
+        "Same face, skin, clothing, and background. "
+        "Edit hair only. "
         f"{attrs.get('color', 'black')} {attrs.get('length', 'medium')} {attrs.get('curl', 'straight')} hair, "
         f"{attrs.get('volume', 'medium')} volume, {attrs.get('bang', 'none')} bangs, "
         f"{attrs.get('side_hair', 'covered')} sides, {attrs.get('style_family', 'other')} style. "
-        "Natural forehead transition, realistic strands, studio lighting."
+        "Natural hairline, realistic strands, studio lighting."
     )
     if extra_prompt:
         return f"{base_prompt} {extra_prompt.strip()}"
@@ -63,8 +64,8 @@ def _prepare_inpaint_inputs(
     mask_path: str | Path,
     target_max_side: int,
 ) -> tuple[Image.Image, Image.Image, tuple[int, int]]:
-    image = Image.open(image_path).convert("RGB")
-    mask = Image.open(mask_path).convert("L")
+    image = Image.open(resolve_project_path(image_path)).convert("RGB")
+    mask = Image.open(resolve_project_path(mask_path)).convert("L")
     original_size = image.size
 
     width, height = original_size
@@ -77,7 +78,7 @@ def _prepare_inpaint_inputs(
     return resized_image, resized_mask, original_size
 
 def _load_reference_image_for_ip_adapter(reference_path: str | Path) -> Image.Image:
-    reference = Image.open(reference_path).convert("RGBA")
+    reference = Image.open(resolve_project_path(reference_path)).convert("RGBA")
 
     # IP-Adapter expects a normal RGB image.
     # Your hairstyle assets may contain transparency, so place them on white background.
@@ -85,6 +86,19 @@ def _load_reference_image_for_ip_adapter(reference_path: str | Path) -> Image.Im
     background.alpha_composite(reference)
 
     return background.convert("RGB")
+
+
+def _is_black_placeholder(image: Image.Image) -> bool:
+    extrema = image.convert("RGB").getextrema()
+    return all(channel_max <= 2 for _, channel_max in extrema)
+
+
+def _disable_safety_checker(pipe: Any) -> None:
+    if hasattr(pipe, "safety_checker"):
+        pipe.safety_checker = None
+    if hasattr(pipe, "register_to_config"):
+        pipe.register_to_config(requires_safety_checker=False)
+
 
 def run_generative_inpaint(
     manifest_path: str | Path,
@@ -99,15 +113,15 @@ def run_generative_inpaint(
     use_ip_adapter: bool = True,
     ip_adapter_scale: float = DEFAULT_IP_ADAPTER_SCALE,
 ) -> dict[str, Any]:
-    manifest_path = Path(manifest_path)
+    manifest_path = resolve_project_path(manifest_path)
     manifest = _load_manifest(manifest_path)
 
     subject = manifest["subject"]
     reference = manifest.get("reference", {})
     generation = manifest.get("generation", {})
 
-    subject_image_path = Path(subject["input_image_path"])
-    mask_path = Path(subject["inpaint_mask_path"])
+    subject_image_path = resolve_project_path(subject["input_image_path"])
+    mask_path = resolve_project_path(subject["inpaint_mask_path"])
 
     reference_image_path = reference.get("image_path")
     reference_image = None
@@ -151,7 +165,6 @@ def run_generative_inpaint(
         pipe = pipe.to(device)
     else:
         pipe = pipe.to(device)
-        pipe.enable_attention_slicing()
 
     if use_ip_adapter and reference_image is not None:
         pipe.load_ip_adapter(
@@ -161,6 +174,13 @@ def run_generative_inpaint(
             cache_dir=str(MODEL_CACHE_DIR),
         )
         pipe.set_ip_adapter_scale(ip_adapter_scale)
+
+    if device != "cuda" and not (use_ip_adapter and reference_image is not None):
+        # On CPU, the IP-Adapter path is more stable without attention slicing.
+        # The sliced attention processor can break adapter loading or the later
+        # forward pass in this environment, so only enable slicing for the
+        # non-IP-Adapter CPU path.
+        pipe.enable_attention_slicing()
 
     pipe_kwargs = {
         "prompt": prompt,
@@ -176,6 +196,19 @@ def run_generative_inpaint(
         pipe_kwargs["ip_adapter_image"] = reference_image
 
     result = pipe(**pipe_kwargs)
+    nsfw_content_detected = getattr(result, "nsfw_content_detected", None)
+    safety_checker_retry_used = False
+    black_placeholder_detected = _is_black_placeholder(result.images[0])
+
+    if (nsfw_content_detected and any(nsfw_content_detected)) or black_placeholder_detected:
+        _disable_safety_checker(pipe)
+        safety_checker_retry_used = True
+        result = pipe(**pipe_kwargs)
+        nsfw_content_detected = getattr(result, "nsfw_content_detected", None)
+        black_placeholder_detected = _is_black_placeholder(result.images[0])
+
+    if black_placeholder_detected:
+        raise RuntimeError("Final generation produced a black placeholder image.")
 
     generated = result.images[0].resize(original_size, Image.Resampling.LANCZOS)
     output_path = manifest_path.parent / output_name
@@ -200,6 +233,9 @@ def run_generative_inpaint(
         "ip_adapter_weight": DEFAULT_IP_ADAPTER_WEIGHT if use_ip_adapter else None,
         "ip_adapter_scale": ip_adapter_scale if use_ip_adapter else None,
         "reference_image_path": str(reference_image_path) if reference_image_path else None,
+        "nsfw_content_detected": nsfw_content_detected,
+        "black_placeholder_detected": black_placeholder_detected,
+        "safety_checker_retry_used": safety_checker_retry_used,
     }
     metadata_path = manifest_path.parent / "final_generation_metadata.json"
     metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")

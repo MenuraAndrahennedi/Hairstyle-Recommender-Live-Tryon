@@ -9,6 +9,7 @@ from support_app.config import (
     FULL_HAIR_ASSET_METADATA_DIR,
     REVIEWED_ASSET_BANK_JSONL,
     REVIEWED_RENDER_SAFE_ASSET_BANK_JSONL,
+    resolve_project_path,
 )
 from support_app.models.schemas import AssetMetadata
 
@@ -34,6 +35,15 @@ def _normalize_optional_label(value: object, fallback: str = "none") -> str:
     return text
 
 
+def _normalize_path_value(value: object) -> str:
+    if value is None:
+        return ""
+    text = str(value).strip()
+    if not text:
+        return ""
+    return str(resolve_project_path(text))
+
+
 def _reviewed_row_to_asset_metadata(row: dict) -> AssetMetadata:
     normalized = row.get("labeling", {}).get("normalized_attributes", {})
     celeba_hints = row.get("celeba_attribute_hints", {})
@@ -51,10 +61,10 @@ def _reviewed_row_to_asset_metadata(row: dict) -> AssetMetadata:
         "asset_id": row["asset_id"],
         "source_dataset": row.get("source_dataset", "CelebA"),
         "gender_suitability": row.get("gender_label"),
-        "raw_label_path": row.get("raw_mask_path", ""),
-        "raw_image_path": row.get("raw_image_path", ""),
-        "image_path": row.get("image_path", ""),
-        "mask_path": row.get("mask_path", ""),
+        "raw_label_path": _normalize_path_value(row.get("raw_mask_path", "")),
+        "raw_image_path": _normalize_path_value(row.get("raw_image_path", "")),
+        "image_path": _normalize_path_value(row.get("image_path", "")),
+        "mask_path": _normalize_path_value(row.get("mask_path", "")),
         "translated_labels": translated_labels,
         "normalized_attributes": {
             "length": _normalize_optional_label(normalized.get("length"), fallback="medium"),
@@ -228,10 +238,10 @@ def _full_hair_row_to_asset_metadata(row: dict, infer_style_family: bool = False
         "asset_id": row["asset_id"],
         "source_dataset": row.get("source_dataset", "CelebA_full_hair"),
         "gender_suitability": row.get("gender_label"),
-        "raw_label_path": row.get("raw_mask_path", ""),
-        "raw_image_path": row.get("raw_image_path", ""),
-        "image_path": row.get("image_path", ""),
-        "mask_path": row.get("mask_path", ""),
+        "raw_label_path": _normalize_path_value(row.get("raw_mask_path", "")),
+        "raw_image_path": _normalize_path_value(row.get("raw_image_path", "")),
+        "image_path": _normalize_path_value(row.get("image_path", "")),
+        "mask_path": _normalize_path_value(row.get("mask_path", "")),
         "translated_labels": translated_labels,
         "normalized_attributes": {
             "length": length,

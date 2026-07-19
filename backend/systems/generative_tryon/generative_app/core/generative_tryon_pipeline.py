@@ -8,7 +8,7 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
 
 from generative_app.bootstrap_static import ensure_static_2d_on_path
-from generative_app.config import PACKAGE_DIR
+from generative_app.config import PACKAGE_DIR, resolve_project_path
 
 
 ensure_static_2d_on_path()
@@ -172,7 +172,7 @@ def prepare_generative_tryon_package(
         input_image = input_image_path.convert("RGBA")
         input_stem = "generative_frame"
     else:
-        input_path = Path(input_image_path)
+        input_path = resolve_project_path(input_image_path)
         input_image = Image.open(input_path).convert("RGBA")
         input_stem = input_path.stem
 

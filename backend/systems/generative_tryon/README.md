@@ -54,7 +54,7 @@ After a package is prepared, you can produce a final inpainted image with:
 
 ```powershell
 cd backend/systems/generative_tryon
-..\..\..\.venv\Scripts\python.exe -m generative_app.core.generative_inpaint_runner --manifest "D:\path\to\package_manifest.json"
+..\..\..\.venv\Scripts\python.exe -m generative_app.core.generative_inpaint_runner --manifest "path/to\package_manifest.json"
 ```
 
 Default model:
